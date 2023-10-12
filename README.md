@@ -1,2 +1,2 @@
 # aiogram-middlewares
-Useful middlewares for aiogram bots
+Useful & flexible middlewares for aiogram bots

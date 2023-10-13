@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# TODO: Update README..
+# TODO: Update README.. & mb aiogram2 support..
 
 
 class ThrottlingMiddleware(BaseMiddleware):

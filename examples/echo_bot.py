@@ -2,18 +2,17 @@ import asyncio
 import logging
 from pathlib import Path
 
-from aiogram_middlewares import ThrottlingMiddleware
-from dotenv import dotenv_values
-
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
+from aiogram_middlewares import ThrottlingMiddleware
+from dotenv import dotenv_values
 
 logging.basicConfig(format='%(filename)s [LINE:%(lineno)d] #%(levelname)-8s [%(asctime)s]  %(message)s', level=logging.INFO)
 logging.getLogger('aiogram_middlewares').setLevel(logging.DEBUG)
 
 # For aiogram v3.x!
-TOKEN = dotenv_values(Path(Path(__file__).parent, '.env'))['BOT_TOKEN']
+TOKEN = dotenv_values(Path(Path(__file__).resolve().parent, '.env'))['BOT_TOKEN']
 
 
 bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)

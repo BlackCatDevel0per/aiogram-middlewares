@@ -16,3 +16,7 @@ build
 dist
 
 *.prof
+
+##
+scripts/simulate_updates_throttle.py
+examples/echo_bot_throttle.py

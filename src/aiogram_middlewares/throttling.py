@@ -24,7 +24,10 @@ logger = logging.getLogger(__name__)
 
 # TODO: Update README.. & mb aiogram2 support..
 
-
+# TODO: Add throttling
+# TODO: Add flags or/and decorators
+# TODO: Add options to choose between antiflood & throttling
+# TODO: Test & optimize =)
 class ThrottlingMiddleware(BaseMiddleware):
 	def __init__(
 		self: ThrottlingMiddleware,

@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 # TODO: Add flags or/and decorators
 # TODO: Add options to choose between antiflood & throttling
 # TODO: Test & optimize =)
+
+# TODO: Mb add debouncing) (topping? XD)
+
 class ThrottlingMiddleware(BaseMiddleware):
 	def __init__(
 		self: ThrottlingMiddleware,

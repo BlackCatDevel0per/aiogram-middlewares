@@ -18,7 +18,7 @@ TOKEN = dotenv_values(Path(Path(__file__).resolve().parent, '.env'))['BOT_TOKEN'
 bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
 
-dp.message.middleware(
+dp.update.outer_middleware(
 	ThrottlingMiddleware(
 		period_sec=8, after_handle_count=2,
 		# topping_up=False,

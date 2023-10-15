@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Mb add debouncing) (topping? XD)
 
+
 class ThrottlingMiddleware(BaseMiddleware):
 	def __init__(
 		self: ThrottlingMiddleware,

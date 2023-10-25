@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aiogram-middlewares"
-version = "0.0.1"
+version = "0.0.2"
 description = "Useful middlewares for aiogram bots =)"
 authors = ["BlackCatDevel0per <bcdev@mail.ru>"]
 license = "Apache 2.0"

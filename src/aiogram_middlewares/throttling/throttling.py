@@ -7,7 +7,8 @@ from aiocache import Cache
 from aiocache.serializers import NullSerializer
 from aiogram import BaseMiddleware
 
-from .caches import AdvancedSimpleMemoryCache
+from aiogram_middlewares.caches import AdvancedSimpleMemoryCache
+
 from .models import ThrottlingData
 
 if TYPE_CHECKING:
@@ -30,6 +31,9 @@ logger = logging.getLogger(__name__)
 # TODO: Test & optimize =)
 
 # TODO: Mb add debouncing) (topping? XD)
+# TODO: Mb role filtering middleare.. (In aiogram2 is useless..)
+
+# TODO: Mb add action on calmdown & after calm
 
 
 class ThrottlingMiddleware(BaseMiddleware):

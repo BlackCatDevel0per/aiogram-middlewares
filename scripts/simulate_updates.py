@@ -5,6 +5,7 @@ import logging
 
 from aiogram_middlewares import ThrottlingMiddleware
 
+# TODO: More fixtures (msg, query, inline and etc. formats & etc) & bug fixes..
 from tests.fixtures import data, empty_handler, message
 
 logging.basicConfig(format='%(filename)s [LINE:%(lineno)d] #%(levelname)-8s [%(asctime)s]  %(message)s', level=logging.INFO)

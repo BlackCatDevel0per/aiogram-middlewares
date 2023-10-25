@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# TODO: Check per-second spam & message spam..
 # TODO: Update README.. & mb aiogram2 support..
 
 # TODO: Add throttling

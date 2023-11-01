@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 class FakeBot:
 	async def send_message(self: FakeBot, chat_id: int, text: str, *args, **kwargs) -> None:
+		# print('%s -> %i' % (text, chat_id))
 		logger.info('%s -> %i', text, chat_id)
 
 
@@ -87,6 +88,8 @@ message = types.Message(
 						media_group_id=None,
 						author_signature=None,
 						text='/start',
+						# text='/say',
+						# text='/say yoohoo!'*10,
 
 						entities=[
 							types.MessageEntity(

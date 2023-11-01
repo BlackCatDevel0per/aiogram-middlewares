@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 	from dataclasses import dataclass as make_dataclass
 	from typing import Any
 
-
+# TODO: Use from..
 # Well..
 def make_dataclass(*args: Any, **kwargs: Any):  # noqa: F811
 	pyv = (sys.version_info.major, sys.version_info.minor)

@@ -1,1 +1,1 @@
-from .throttling import ThrottlingMiddleware
+from .throttling import *  # noqa: F403

@@ -24,7 +24,7 @@ classifiers = [
 ]
 
 [tool.ruff]
-line-length = 160
+line-length = 100
 select = [
 	"RUF",
 	"FBT",

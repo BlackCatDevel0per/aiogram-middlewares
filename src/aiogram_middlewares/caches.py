@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from time import monotonic
+from time import perf_counter
 
 from aiocache import SimpleMemoryCache
 from aiocache.base import API, logger
@@ -42,7 +42,7 @@ class AdvancedSimpleMemoryCache(SimpleMemoryCache):
 		:returns: True if the value was set
 		:raises: :class:`asyncio.TimeoutError` if it lasts more than self.timeout
 		"""
-		start = monotonic()
+		start = perf_counter()
 		dumps = dumps_fn or self._serializer.dumps
 		ns = namespace if namespace is not None else self.namespace
 		ns_key = self.build_key(key, namespace=ns)
@@ -51,5 +51,5 @@ class AdvancedSimpleMemoryCache(SimpleMemoryCache):
 			ns_key, dumps(value), _cas_token=_cas_token, _conn=_conn,
 		)  # ??
 
-		logger.debug('SET %s %d (%.4f)s', ns_key, True, monotonic() - start)  # noqa: FBT003
+		logger.debug('SET %s %d (%.4f)s', ns_key, True, perf_counter() - start)  # noqa: FBT003
 		return res

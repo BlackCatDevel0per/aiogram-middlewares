@@ -5,10 +5,13 @@ from pathlib import Path
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram_middlewares import ThrottlingMiddleware
+from aiogram_middlewares import RateLimiter, ThrottlingMiddleware
 from dotenv import dotenv_values
 
-logging.basicConfig(format='%(filename)s [LINE:%(lineno)d] #%(levelname)-8s [%(asctime)s]  %(message)s', level=logging.INFO)
+logging.basicConfig(
+	format='%(filename)s [LINE:%(lineno)d] #%(levelname)-8s [%(asctime)s]  %(message)s',
+	level=logging.INFO,
+)
 logging.getLogger('aiogram_middlewares').setLevel(logging.DEBUG)
 
 # For aiogram v3.x!
@@ -20,14 +23,15 @@ dp = Dispatcher()
 
 dp.update.outer_middleware(
 	ThrottlingMiddleware(
-		period_sec=8, after_handle_count=2,
+		period_sec=3, after_handle_count=2,
 		# topping_up=False,
+		is_cache_unity=False,  # Because will throttle twice with filters cache.
 	),
 )
 
 
-@dp.message(Command('start'))
-async def start_handler(message: types.Message) -> None:
+@dp.message(RateLimiter(period_sec=15, after_handle_count=2), Command('help'))
+async def help_handler(message: types.Message) -> None:
 	await message.reply('Hi! This is echo bot for testing throttling =)')
 
 

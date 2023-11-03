@@ -106,6 +106,10 @@ class Throttling:
 		# TODO: Cache autocleaner schedule (if during work had network glitch or etc.)
 		# TODO: Mb rename topping to debouncing..
 		bases: list[type] = [SelfAssemble]
+
+		if not isinstance(kwargs.get('cache_serializer'), (NullSerializer, type(None))):
+			bases.append(ThrottlingSerializable)
+
 		# FIXME: Recheck! & queuing..
 		# FIXME: warnings_count
 		if kwargs.get('cooldown_message', _NO_SET) is not None and \
@@ -119,9 +123,6 @@ class Throttling:
 
 		if kwargs.pop('topping_up', _NO_SET):
 			bases.append(ThrottlingDebouncable)
-
-		if not isinstance(kwargs.get('cache_serializer'), (NullSerializer, type(None))):
-			bases.append(ThrottlingSerializable)
 		bases.append(ThrottlingBase)
 
 		print(bases)

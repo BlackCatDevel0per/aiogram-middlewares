@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aiogram-middlewares"
-version = "0.0.2"
+version = "0.0.3"
 description = "Useful middlewares for aiogram bots =)"
 authors = ["BlackCatDevel0per <bcdev@mail.ru>"]
 license = "Apache 2.0"
@@ -87,11 +87,12 @@ select = [
 ignore = [
 	"W191", "D206", "RET502",
 	"UP040",  # New type aliases (type hinting)
-	"PTH123"  # Not good solution for all things..
+	"PTH123",  # Not good solution for all things..
+	"TD001",
+	"TD002",
+	"TD003",
+	"S101",
 ]  # Add RET503?
-
-[flake8-quotes]
-inline-quotes = "single"
 
 src = ["src/aiogram_middlewares", "tests", "scripts", "examples"]
 exclude = [
@@ -108,11 +109,20 @@ exclude = [
 ]
 target-version = "py38"
 
+[tool.ruff.flake8-quotes]
+inline-quotes = "single"
+
+[tool.ruff.format]
+indent-style = "tab"
+
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
 aiocache = "^0.12.2"
 brotli = {version = "^1.1.0", optional = true}
 aiogram = "^3.1.1"
+
+[tool.poetry.extras]
+optional = ['brotli']
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.0.292"

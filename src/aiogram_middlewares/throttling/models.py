@@ -14,5 +14,6 @@ class ThrottlingData:
 	sent_warning_count: int
 
 	def update_counter(self: ThrottlingData, counter: str, count: int = 1) -> None:
+		"""Count up one of counters in this dataclass."""
 		cnt: int = self.__getattribute__(counter)
 		self.__setattr__(counter, cnt + count)

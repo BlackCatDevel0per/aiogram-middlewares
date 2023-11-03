@@ -984,7 +984,10 @@ files = [
 idna = ">=2.0"
 multidict = ">=4.0"
 
+[extras]
+optional = ["brotli"]
+
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4.0"
-content-hash = "939b0910bfbd636a6c23be91628b8393bb0af075ab177c1746485a6de7008dad"
+content-hash = "d330b97634dc4e7f7e54652fe601364b390dd60055f005c11e38619e7ac50bd0"

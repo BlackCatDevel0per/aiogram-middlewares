@@ -5,9 +5,7 @@ from pathlib import Path
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-
-from aiogram_middlewares.throttling.throttling import Throttling as ThrottlingMiddleware
-# from aiogram_middlewares import RateLimiter, ThrottlingMiddleware
+from aiogram_middlewares import RateLimiter, ThrottlingMiddleware
 
 # from aiogram_middlewares.utils import BrotliedPickleSerializer
 from dotenv import dotenv_values

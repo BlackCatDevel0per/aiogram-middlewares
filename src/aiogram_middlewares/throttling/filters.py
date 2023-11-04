@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING
 
 from aiogram.filters import Filter
 
-from .throttling import Throttling
+from .base import ThrottlingAttrsABC
+from .throttling import assemble_throttle
 
 if TYPE_CHECKING:
 	from typing import Any, Awaitable, Callable, Dict
 
 	from aiogram import Bot
 	from aiogram.types import Update, User
-	from pydantic.types import PositiveInt
 
 	from .models import ThrottlingData
 
@@ -30,27 +30,10 @@ logger = logging.getLogger(__name__)
 
 # TODO: Rename..
 # TODO: Review..
-class RateLimiter(Throttling, Filter):
+@assemble_throttle
+class RateLimiter(ThrottlingAttrsABC, Filter):
 	middleware: ThrottleFilterMiddleware
 	# Limits should be greater than in middleware.. (For handle times too!)
-	def __init__(
-		self: RateLimiter,
-		*, period_sec: PositiveInt = 3, after_handle_count: PositiveInt = 1,
-		warnings_count: PositiveInt = 2,
-		calmed_message: str | None = None,
-		cooldown_message: str = 'Calm down!', topping_up: bool = True,
-		is_cache_unity: bool = False,
-	) -> None:
-		# TODO: Some optional kwargs..
-		super().__init__(
-			period_sec=period_sec,
-			after_handle_count=after_handle_count,
-			warnings_count=warnings_count,
-			cooldown_message=cooldown_message,
-			calmed_message=calmed_message,
-			topping_up=topping_up,
-			is_cache_unity=is_cache_unity,
-		)
 
 
 	async def proc_handle(

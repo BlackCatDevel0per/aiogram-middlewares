@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from inspect import signature as inspect_signature
 from typing import TYPE_CHECKING
 
 from aiocache import Cache
@@ -60,6 +61,7 @@ class ThrottlingABC(ThrottlingAttrsABC):
 		self: ThrottlingABC, throttling_data: _TD | None,
 		event_user: User, ttl: int, bot: Bot,
 	) -> ThrottlingData | _TD:
+		raise NotImplementedError
 		return throttling_data or ThrottlingData(rate=0, sent_warning_count=0)
 
 
@@ -73,7 +75,7 @@ class ThrottlingABC(ThrottlingAttrsABC):
 		bot: Bot,
 		throttling_data: ThrottlingData,
 	) -> Any:
-		return NotImplementedError
+		raise NotImplementedError
 
 
 class ThrottlingBase(ThrottlingABC):
@@ -82,9 +84,9 @@ class ThrottlingBase(ThrottlingABC):
 
 	def __init__(
 		self: ThrottlingBase,
-		period_sec: PositiveInt = 3, after_handle_count: PositiveInt = 1, *,
+		period_sec: PositiveInt, after_handle_count: PositiveInt, *,
 
-		is_cache_unity: bool = False,  # Because will throttle twice with filters cache.
+		is_cache_unity: bool,  # Because will throttle twice with filters cache.
 	) -> None:
 		# TODO: More docstrings!!!
 		# TODO: Cache autocleaner schedule (if during work had network glitch or etc.)
@@ -112,16 +114,39 @@ class ThrottlingBase(ThrottlingABC):
 		return repr(self)
 
 
-	def __repr__(self: ThrottlingBase) -> str:
-		# FIXME: Bruh
-		##
-		# FIXME: Dots for long strs..
-		#
-		return (
+	@property
+	def _signature(self: ThrottlingBase) -> str:
+		sign: tuple[str, ...] = tuple(inspect_signature(self.__init__).parameters)
+		attrs: list[str] = [attr for attr in sign if getattr(self, attr, None)]
+		del sign
+		self_attrs: dict[str, Any] = {attr: getattr(self, attr) for attr in attrs}
+		MAX_LEN = 16
+		for name, attr in self_attrs.items():
+			if isinstance(attr, (str, list)):
+				if len(attr) > MAX_LEN:
+					attr = attr[:MAX_LEN]
+					if isinstance(attr, str):
+						attr = f'{attr}...'
+
+				#
+				if isinstance(attr, str):
+					attr = f"'{attr}'" if "'" not in attr else f'"{attr}"'
+
+				self_attrs[name] = attr
+
+		args: str = ', '.join(f'{name}={attr}' for name, attr in self_attrs.items())
+		del self_attrs
+		s = (
 			f'{self.__class__.__name__}'
-			f'(period_sec={self.period_sec}, '
-			f'after_handle_count={self.after_handle_count})'
+			'('
+			f'{args}'
+			')'
 		)
+		del args
+		return s
+
+	def __repr__(self: ThrottlingBase) -> str:
+		return self._signature
 
 
 	##
@@ -138,20 +163,22 @@ class ThrottlingBase(ThrottlingABC):
 
 
 	##
+	# Bound to class obj.
 	def choose_cache(self: ThrottlingBase, class_: _TI) -> ThrottlingBase:
+		# TODO: Better logging..
 		if self.__is_cache_unity:
 			if class_._cache is None:  # noqa: SLF001
 				class_._cache = self._cache  # noqa: SLF001
 			del self._cache
 			self._cache = class_._cache  # noqa: SLF001
 			logger.debug(
-				'Using unity cache instance on address `%s`, obj: `%s`',
-				hex(id(class_._cache)), repr(self),  # noqa: SLF001
+				'Using unity cache on address `%s`',
+				hex(id(class_._cache)),  # noqa: SLF001
 			)
 		else:
 			logger.debug(
-				'Using self cache instance on address `%s`, obj: `%s`',
-				hex(id(self._cache)), repr(self),
+				'Using self cache on address `%s`',
+				hex(id(self._cache)),
 			)
 		return self
 

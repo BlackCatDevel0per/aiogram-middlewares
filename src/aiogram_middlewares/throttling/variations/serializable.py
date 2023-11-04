@@ -3,8 +3,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from aiocache.serializers import PickleSerializer
-
 from aiogram_middlewares.throttling.base import ThrottlingAttrsABC
 
 if TYPE_CHECKING:
@@ -29,7 +27,7 @@ class ThrottlingSerializable(ThrottlingAttrsABC):
 
 	def __init__(
 		self: ThrottlingSerializable,
-		cache_serializer: BaseSerializer = PickleSerializer,
+		cache_serializer: BaseSerializer,
 	) -> None:
 		del self._cache  ##
 		self._cache = self._make_cache(self.period_sec, cache_serializer)

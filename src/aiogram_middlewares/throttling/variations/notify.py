@@ -29,7 +29,7 @@ class ThrottlingNotifyBase(ThrottlingAttrsABC):
 		self: ThrottlingNotifyBase,
 		warnings_count: PositiveInt,
 	) -> None:
-		assert warnings_count >= 1, '`after_handle_count` must be positive!'
+		assert warnings_count >= 1, '`warnings_count` must be positive!'
 
 		self.warnings_count = warnings_count
 

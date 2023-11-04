@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 	from aiogram import Bot
 	from aiogram.types import Update, User
 
-	from .models import ThrottlingData
+	from .models import RateData
 
 	# Outer (on handlers): TelegramEventObserver.trigger
 	# Inner (per handler): HandlerObject.call
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 	ThrottleMiddleCall = Callable[
 		[
 			HandleType,
-			ThrottlingData,
+			RateData,
 			Update, User, Bot, HandleData,
 		], Any,
 	]
@@ -26,19 +26,20 @@ if TYPE_CHECKING:
 	_ThrottleMiddlewareMethod = Callable[
 		[
 			HandleType,
-			Update, User, HandleData, Bot, ThrottlingData,
+			Update, User, HandleData, Bot, RateData,
 		], Any,
 	]
 
-	_TD = TypeVar('_TD', bound=ThrottlingData)
+	_TD = TypeVar('_TD', bound=RateData)
 
 	_BaseThrottleMethod = Callable[
-		[Union[_TD, None], User, int, Bot], Awaitable[Union[ThrottlingData, _TD]],
+		[Union[_TD, None], User, int, Bot], Awaitable[Union[RateData, _TD]],
 	]
 
+	RateDataCounterAttrType = Literal['rate', 'sent_warning_count']
 	_ProcHandleMethod = Callable[
 		[
-			HandleType, ThrottlingData, Literal['rate', 'sent_warning_count'],
+			HandleType, RateData, RateDataCounterAttrType,
 			Update, User, HandleData,
 		], Any,
 	]

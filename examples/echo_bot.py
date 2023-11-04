@@ -2,12 +2,11 @@ import asyncio
 import logging
 from pathlib import Path
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, F, types
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram_middlewares import RateLimiter, ThrottlingMiddleware
-
-# from aiogram_middlewares.utils import BrotliedPickleSerializer
+from aiogram_middlewares import RateLimiter, RateMiddleware
+from aiogram_middlewares.utils import BrotliedPickleSerializer
 from dotenv import dotenv_values
 
 logging.basicConfig(
@@ -24,30 +23,32 @@ bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
 
 dp.update.outer_middleware(
-	ThrottlingMiddleware(
-		period_sec=3, after_handle_count=2,
-		# topping_up=False,
+	RateMiddleware(
+		period_sec=5, after_handle_count=1,
+		# topping_up=False,  # it breaks through a bit -_-
 		# cooldown_message=None,
 		# calmed_message=None,
-		# cache_serializer=BrotliedPickleSerializer,
+		cache_serializer=BrotliedPickleSerializer,
 	),
 )
 
 
 @dp.message(
 	Command('help'),
-	# RateLimiter(
-	# 	period_sec=15,
-	# 	after_handle_count=2,
-	# 	topping_up=False,
-	# 	# calmed_message=None,  # Because we don't want more messages)
-	# ),
+	RateLimiter(
+		period_sec=15, after_handle_count=2,
+		# topping_up=False,
+		# calmed_message=None,  # Because we don't want more messages)
+		# cache_serializer=BrotliedPickleSerializer,
+	),
 )
 async def help_handler(message: types.Message) -> None:
-	await message.reply('Hi! This is echo bot for testing throttling =)')
+	await message.reply('Hi! This is echo bot for testing antiflood with throttling + debouncing =)')
 
 
-@dp.message()
+@dp.message(
+	F.text != '/help',
+)
 async def echo_handler(message: types.Message) -> None:
 	await message.send_copy(chat_id=message.chat.id)
 

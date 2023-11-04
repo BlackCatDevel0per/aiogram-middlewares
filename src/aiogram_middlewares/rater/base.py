@@ -10,7 +10,7 @@ from aiocache.serializers import NullSerializer
 
 from aiogram_middlewares.caches import AdvancedSimpleMemoryCache
 
-from .models import ThrottlingData
+from .models import RateData
 
 if TYPE_CHECKING:
 	from typing import Any, Callable, TypeVar
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 	from .types import (
 		_TD,
 		HandleType,
+		RateDataCounterAttrType,
 		_BaseThrottleMethod,
 		_ProcHandleMethod,
 		_ThrottleMiddlewareMethod,
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ThrottlingAttrsABC(ABC):
+class RaterAttrsABC(ABC):
 	_cache: AdvancedSimpleMemoryCache
 	period_sec: PositiveInt
 	after_handle_count: PositiveInt
@@ -44,49 +45,49 @@ class ThrottlingAttrsABC(ABC):
 
 
 	##
-	_throttle: _BaseThrottleMethod
+	_trigger: _BaseThrottleMethod
 	proc_handle: _ProcHandleMethod
 
 	# For serializer
 	_middleware: _ThrottleMiddlewareMethod
-	choose_cache: Callable[[_TI], ThrottlingBase]
+	choose_cache: Callable[[_TI], RaterBase]
 	_make_cache: Callable[[int, BaseSerializer], AdvancedSimpleMemoryCache]
 
 
 # FIXME: Hints.. Annotations clses..
-class ThrottlingABC(ThrottlingAttrsABC):
+class RaterABC(RaterAttrsABC):
 
 	@abstractmethod
-	async def throttle(
-		self: ThrottlingABC, throttling_data: _TD | None,
+	async def trigger(
+		self: RaterABC, rater_data: _TD | None,
 		event_user: User, ttl: int, bot: Bot,
-	) -> ThrottlingData | _TD:
+	) -> RateData | _TD:
 		raise NotImplementedError
-		return throttling_data or ThrottlingData(rate=0, sent_warning_count=0)
+		return rater_data or RateData(rate=0, sent_warning_count=0)
 
 
 	@abstractmethod
 	async def middleware(
-		self: ThrottlingABC,
+		self: RaterABC,
 		handle: HandleType,
 		event: Update,
 		event_user: User,
 		data: dict[str, Any],
 		bot: Bot,
-		throttling_data: ThrottlingData,
+		rater_data: RateData,
 	) -> Any:
 		raise NotImplementedError
 
 
-class ThrottlingBase(ThrottlingABC):
+class RaterBase(RaterABC):
 
 	_cache: AdvancedSimpleMemoryCache = None  # type: ignore
 
 	def __init__(
-		self: ThrottlingBase,
+		self: RaterBase,
 		period_sec: PositiveInt, after_handle_count: PositiveInt, *,
 
-		is_cache_unity: bool,  # Because will throttle twice with filters cache.
+		is_cache_unity: bool,  # Because will trigger twice with filters cache.
 	) -> None:
 		# TODO: More docstrings!!!
 		# TODO: Cache autocleaner schedule (if during work had network glitch or etc.)
@@ -99,7 +100,7 @@ class ThrottlingBase(ThrottlingABC):
 			logger.warning('Recommended to set above 3 for `period_sec` param..')
 
 		self.period_sec = period_sec
-		self.after_handle_count = after_handle_count - 1
+		self.after_handle_count = after_handle_count
 
 		# FIXME: Mb move to cache choose part.. 
 		self._cache: AdvancedSimpleMemoryCache = self._make_cache(period_sec)  # FIXME: Correct type hint??
@@ -107,15 +108,15 @@ class ThrottlingBase(ThrottlingABC):
 		# For unity cache for all instances
 		#
 		self.__is_cache_unity = is_cache_unity
-		self.choose_cache(ThrottlingBase)
+		self.choose_cache(RaterBase)
 
 
-	def __str__(self: ThrottlingBase) -> str:
+	def __str__(self: RaterBase) -> str:
 		return repr(self)
 
 
 	@property
-	def _signature(self: ThrottlingBase) -> str:
+	def _signature(self: RaterBase) -> str:
 		sign: tuple[str, ...] = tuple(inspect_signature(self.__init__).parameters)
 		attrs: list[str] = [attr for attr in sign if getattr(self, attr, None)]
 		del sign
@@ -145,13 +146,13 @@ class ThrottlingBase(ThrottlingABC):
 		del args
 		return s
 
-	def __repr__(self: ThrottlingBase) -> str:
+	def __repr__(self: RaterBase) -> str:
 		return self._signature
 
 
 	##
 	def _make_cache(
-		self: ThrottlingBase, period_sec: int, cache_serializer: BaseSerializer = NullSerializer,
+		self: RaterBase, period_sec: int, cache_serializer: BaseSerializer = NullSerializer,
 	) -> AdvancedSimpleMemoryCache:
 		return Cache(  # FIXME: Correct type hint??
 			cache_class=AdvancedSimpleMemoryCache,
@@ -164,7 +165,7 @@ class ThrottlingBase(ThrottlingABC):
 
 	##
 	# Bound to class obj.
-	def choose_cache(self: ThrottlingBase, class_: _TI) -> ThrottlingBase:
+	def choose_cache(self: RaterBase, class_: _TI) -> RaterBase:
 		# TODO: Better logging..
 		if self.__is_cache_unity:
 			if class_._cache is None:  # noqa: SLF001
@@ -183,44 +184,44 @@ class ThrottlingBase(ThrottlingABC):
 		return self
 
 
-	async def throttle(
-		self: ThrottlingBase, throttling_data: _TD | None,
+	async def trigger(
+		self: RaterBase, rater_data: _TD | None,
 		event_user: User, ttl: int, bot: Bot,
-	) -> ThrottlingData | _TD:
-		return await self._throttle(throttling_data, event_user, ttl, bot)
+	) -> RateData | _TD:
+		return await self._trigger(rater_data, event_user, ttl, bot)
 
 
-	async def _throttle(
-		self: ThrottlingBase, throttling_data: _TD | None,
+	async def _trigger(
+		self: RaterBase, rater_data: _TD | None,
 		event_user: User, ttl: int, bot: Bot,  # noqa: ARG002
-	) -> ThrottlingData | _TD:
+	) -> RateData | _TD:
 		"""Antiflood.."""
-		# Runs if first throttled, else returns data (counters)
-		if not throttling_data:
+		# Runs at first trigger to create entity, else returns data (counters)
+		if not rater_data:
 			logger.debug(
 				'[%s] Handle user (begin): %s',
 				self.__class__.__name__, event_user.username,
 			)
-			throttling_data = ThrottlingData(rate=0, sent_warning_count=0)##def
+			rater_data = RateData(rate=0, sent_warning_count=0)##def
 			# Add new item to cache with ttl from initializator.
 			# (`Cache.add` does the same, but with checking in cache..)
 			# TODO: Mb make custom variant for that..
 			# TODO: Clean cache on exceptions.. (to avoid mutes..)
 			await self._cache.set(
-				event_user.id, throttling_data,
+				event_user.id, rater_data,
 				ttl,
 			)
-		return throttling_data
+		return rater_data
 
 
 	async def proc_handle(
-		self: ThrottlingBase,
+		self: RaterBase,
 		handle: HandleType,
-		throttling_data: ThrottlingData, counter: str,
+		rater_data: RateData, counter: RateDataCounterAttrType,
 		event: Update, event_user: User, data: dict[str, Any],
 	) -> Any:
 		"""Process handle's update."""
-		throttling_data.update_counter(counter)
+		rater_data.update_counter(counter)
 		# TODO: Mb log handle's name..
 		logger.debug(
 			'[%s] Handle user (proc): %s',
@@ -229,37 +230,40 @@ class ThrottlingBase(ThrottlingABC):
 		return await handle(event, data)
 
 
+	# For front stuff
 	async def middleware(
-		self: ThrottlingBase,
+		self: RaterBase,
 		handle: HandleType,
 		event: Update,
 		event_user: User,
 		data: dict[str, Any],
 		bot: Bot,
-		throttling_data: ThrottlingData,
+		rater_data: RateData,
 	) -> Any | None:
-		return await self._middleware(handle, event, event_user, data, bot, throttling_data)
+		return await self._middleware(handle, event, event_user, data, bot, rater_data)
 
 
 	async def _middleware(
-		self: ThrottlingBase,
+		self: RaterBase,
 		handle: HandleType,
 		event: Update,
 		event_user: User,
 		data: dict[str, Any],
 		bot: Bot,
-		throttling_data: ThrottlingData,
+		rater_data: RateData,
 	) -> Any | None:
 		"""Main middleware."""
 		# TODO: Mb one more variant(s) for debug..
 
 		# TODO: Data types variants..
-		is_not_exceed_rate = self.after_handle_count > throttling_data.rate
+		is_not_exceed_rate = self.after_handle_count > rater_data.rate
 
 		# proc/pass update action (run times from `after_handle_amount`)
 		if is_not_exceed_rate:
+			# count up rate & proc
+			# FIXME: Rename..
 			return await self.proc_handle(
-				handle, throttling_data, 'rate', event, event_user,
+				handle, rater_data, 'rate', event, event_user,
 				data,
 			)
 

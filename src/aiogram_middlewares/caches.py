@@ -45,20 +45,23 @@ class _ASMCLazyBackend(SimpleMemoryCache):
 	) -> bool | int:
 		if key in self._cache:
 			handle = self._handlers.pop(key, None)
+			handle_remaining = None
 			if handle:
-				handle.cancel()
-			if ttl:
-				# TODO: Get loop method.. (as property)
-				loop = asyncio.get_running_loop()
-				self._handlers[key] = loop.call_later(
-					ttl,
-					lambda: asyncio.create_task(self._delete_and_call(key, plugged_awaitable)),
-				)
+				# NOTE: Hmm..
+				handle_remaining = handle.when() - perf_counter()
+				if handle_remaining:
+					handle.cancel()
+					# TODO: Get loop method.. (as property)
+					loop = asyncio.get_running_loop()
+					self._handlers[key] = loop.call_later(
+						ttl or handle_remaining,
+						lambda: asyncio.create_task(self._delete_and_call(key, plugged_awaitable)),
+					)
 			return True
 
 		return False
 
-	# Just optimized variant of _expire + _set_sub_handler..
+	# Just optimized variant of _expire + _set_sub_handler.. & unused..
 	async def _expire_with_sub_handler(
 		self: _ASMCLazyBackend, key: Any, plugged_awaitable: PluggedAwaitable,
 		ttl: int, _conn: _ASMCLazyBackend | None = None,
@@ -66,7 +69,7 @@ class _ASMCLazyBackend(SimpleMemoryCache):
 		if key in self._cache:
 			handle = self._handlers.pop(key, None)
 			if handle:
-				handle.cancel()
+				handle.cancel()  # FIXME: Optional use old ttl.. Or add second handler to first..
 			if ttl:
 				loop = asyncio.get_running_loop()
 				# FIXME: Duplication, move to other method..
@@ -128,7 +131,7 @@ class AdvancedSimpleMemoryCache(_ASMCLazyBackend):
 	@API.plugins
 	async def set_sub_handler(
 		self: AdvancedSimpleMemoryCache, key: Any, plugged_awaitable: PluggedAwaitable,
-		ttl: int,
+		ttl: int | None = None,
 		namespace: str | None = None, _conn: AdvancedSimpleMemoryCache | None = None,
 	) -> bool | int:
 		"""Add sub-handler on item deletion from cache.
@@ -137,6 +140,7 @@ class AdvancedSimpleMemoryCache(_ASMCLazyBackend):
 		:param ttl: int the expiration time in seconds. Due to memcached
 			restrictions if you want compatibility use int. In case you
 			need milliseconds, redis and memory support float ttls
+			(if not passed will use remaining ttl)
 		:param dumps_fn: callable alternative to use as dumps function
 		:param namespace: alternative namespace to use
 		:returns: True if the sub-handler was set
@@ -155,6 +159,7 @@ class AdvancedSimpleMemoryCache(_ASMCLazyBackend):
 		return ret
 
 
+	# Unused..
 	@API.register
 	@API.aiocache_enabled(fake_return=False)
 	@API.timeout

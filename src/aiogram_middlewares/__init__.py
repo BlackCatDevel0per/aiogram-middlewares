@@ -1,1 +1,1 @@
-from .throttling import *  # noqa: F403
+from .rater import *  # noqa: F403

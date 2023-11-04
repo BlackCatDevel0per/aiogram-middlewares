@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING
 from aiocache.serializers import NullSerializer
 from aiogram import BaseMiddleware
 
-from .base import ThrottlingAttrsABC, ThrottlingBase
-from .variations import (
-	ThrottlingDebouncable,
-	ThrottlingNotifyCalmed,
-	ThrottlingNotifyCC,
-	ThrottlingNotifyCooldown,
-	ThrottlingSerializable,
+from .base import RaterAttrsABC, RaterBase
+from .extensions import (
+	RateDebouncable,
+	RateNotifyCalmed,
+	RateNotifyCC,
+	RateNotifyCooldown,
+	RaterSerializable,
 )
 
 if TYPE_CHECKING:
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 	from aiogram_middlewares.types import HandleData, HandleType
 
-	from .models import ThrottlingData
+	from .models import RateData
 
 
 logger = logging.getLogger(__name__)
@@ -60,44 +60,53 @@ class AssembleInit:
 		is_cache_unity: bool = False,  # Because will throttle twice with filters cache.
 	):
 		mro = self.__class__.__mro__
-		ThrottlingBase.__init__(
+		RaterBase.__init__(
 			self,
 			period_sec=period_sec, after_handle_count=after_handle_count,
 			is_cache_unity=is_cache_unity,
 		)
-		if ThrottlingSerializable in mro:
-			ThrottlingSerializable.__init__(
+		if RaterSerializable in mro:
+			RaterSerializable.__init__(
 				self,
 				cache_serializer=cache_serializer,
 			)
 
-		if ThrottlingDebouncable in mro:
-			ThrottlingDebouncable.__init__(self)
+		if RateDebouncable in mro:
+			RateDebouncable.__init__(self)
 
-		if ThrottlingNotifyCC in mro:
-			ThrottlingNotifyCC.__init__(
+		if RateNotifyCC in mro:
+			RateNotifyCC.__init__(
 				self,
 				cooldown_message=cooldown_message,
 				calmed_message=calmed_message,
 				warnings_count=warnings_count,
 			)
 		##
-		elif ThrottlingNotifyCooldown in mro:
-			ThrottlingNotifyCooldown.__init__(
+		elif RateNotifyCooldown in mro:
+			logger.debug(
+				'Calmed notify disabled for `%s` at `%s`',
+				self.__class__.__name__, hex(id(self.__class__.__name__)),
+			)
+
+			RateNotifyCooldown.__init__(
 				self,
 				cooldown_message=cooldown_message,
 				warnings_count=warnings_count,
 			)
-		elif ThrottlingNotifyCalmed in mro:
-			ThrottlingNotifyCalmed.__init__(
+		elif RateNotifyCalmed in mro:
+			logger.debug(
+				'Cooldown notify disabled for `%s` at `%s`',
+				self.__class__.__name__, hex(id(self.__class__.__name__)),
+			)
+
+			RateNotifyCalmed.__init__(
 				self,
 				calmed_message=calmed_message,
-				warnings_count=warnings_count,
 			)
 
 
 # Assemble throttling
-class ThrottlingAssembler:
+class RaterAssembler:
 
 	def __new__(
 		cls: type, **kwargs: Any,  #~
@@ -114,22 +123,22 @@ class ThrottlingAssembler:
 		bases: list[type] = [bound, AssembleInit]
 
 		if not isinstance(kwargs.get('cache_serializer'), (NullSerializer, type(None))):
-			bases.append(ThrottlingSerializable)
+			bases.append(RaterSerializable)
 
 		# FIXME: Recheck! & queuing..
 		# FIXME: warnings_count
 		if kwargs.get('cooldown_message', _NO_SET) is not None and \
 			kwargs.get('calmed_message', _NO_SET) is not None:
-			bases.append(ThrottlingNotifyCC)
+			bases.append(RateNotifyCC)
 		##
 		elif kwargs.get('cooldown_message', _NO_SET) is not None:
-			bases.append(ThrottlingNotifyCooldown)
+			bases.append(RateNotifyCooldown)
 		elif kwargs.get('calmed_message', _NO_SET) is not None:
-			bases.append(ThrottlingNotifyCalmed)
+			bases.append(RateNotifyCalmed)
 
 		if kwargs.pop('topping_up', _NO_SET):
-			bases.append(ThrottlingDebouncable)
-		bases.append(ThrottlingBase)
+			bases.append(RateDebouncable)
+		bases.append(RaterBase)
 
 		_bases: tuple[type, ...] = tuple(bases)
 		del bases
@@ -149,16 +158,16 @@ class ThrottlingAssembler:
 
 
 # Pass class
-def assemble_throttle(bound: object, **kwargs):
-	return partial(ThrottlingAssembler, bound=bound, **kwargs)
+def assemble_rater(bound: object, **kwargs):
+	return partial(RaterAssembler, bound=bound, **kwargs)
 
 
-@assemble_throttle
-class ThrottlingMiddleware(ThrottlingAttrsABC, BaseMiddleware):
-	"""Throttling middleware (usually for outer usage)."""
+@assemble_rater
+class RateMiddleware(RaterAttrsABC, BaseMiddleware):
+	"""Rater middleware (usually for outer usage)."""
 
 	async def __call__(
-		self: ThrottlingMiddleware,
+		self: RateMiddleware,
 		handle: HandleType,
 		event: Update,
 		data: HandleData,
@@ -167,8 +176,8 @@ class ThrottlingMiddleware(ThrottlingAttrsABC, BaseMiddleware):
 		event_user: User = data['event_from_user']
 		bot: Bot = data['bot']
 
-		event_user_throttling_data: ThrottlingData | None = await self._cache.get(event_user.id)
-		throttling_data: ThrottlingData = await self.throttle(
+		event_user_throttling_data: RateData | None = await self._cache.get(event_user.id)
+		throttling_data: RateData = await self.trigger(
 			event_user_throttling_data, event_user, self.period_sec, bot,
 		)
 		del event_user_throttling_data

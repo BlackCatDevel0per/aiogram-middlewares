@@ -103,7 +103,7 @@ class RaterBase(RaterABC):
 		self.after_handle_count = after_handle_count
 
 		# FIXME: Mb move to cache choose part.. 
-		self._cache: AdvancedSimpleMemoryCache = self._make_cache(period_sec)  # FIXME: Correct type hint??
+		self._cache: AdvancedSimpleMemoryCache = self._make_cache(period_sec)
 
 		# For unity cache for all instances
 		#

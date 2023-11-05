@@ -3,10 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-	from typing import Any, Awaitable, Callable, Dict, Literal, TypeVar, Union
+	from asyncio import TimerHandle
+	from typing import Any, Awaitable, Callable, Dict, Literal, Optional, TypeVar, Union
 
 	from aiogram import Bot
 	from aiogram.types import Update, User
+
+	from aiogram_middlewares.caches import _ASMCLazyBackend
 
 	from .models import RateData
 
@@ -42,4 +45,26 @@ if TYPE_CHECKING:
 			HandleType, RateData, RateDataCounterAttrType,
 			Update, User, HandleData,
 		], Any,
+	]
+
+
+	PluggedAwaitable = Callable[[], Awaitable]
+	_ASMCLazyBackend_ins = _ASMCLazyBackend
+	_conn_type = Union[_ASMCLazyBackend, None]
+	opt_ttl = Optional[int]
+
+	_status_type = Union[bool, int]
+
+	AsyncHandlable = Callable[
+		[
+			_ASMCLazyBackend_ins, Any, PluggedAwaitable, opt_ttl,
+			TimerHandle, float, _conn_type,
+		],
+		Awaitable[_status_type],
+	]
+	WrappedHandlable = Callable[
+		[
+			_ASMCLazyBackend_ins, Any, PluggedAwaitable, opt_ttl, _conn_type,
+		],
+		Awaitable[Union[bool, int]],
 	]

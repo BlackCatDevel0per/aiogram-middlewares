@@ -4,7 +4,6 @@ import logging
 from functools import partial
 from typing import TYPE_CHECKING
 
-from aiocache.serializers import NullSerializer
 from aiogram import BaseMiddleware
 
 from .base import RaterAttrsABC, RaterBase
@@ -19,12 +18,12 @@ from .extensions import (
 if TYPE_CHECKING:
 	from typing import Any
 
-	from aiocache.serializers import BaseSerializer
 	from aiogram import Bot
 	from aiogram.types import Update, User
 	from pydantic.types import PositiveInt
 
 	from aiogram_middlewares.types import HandleData, HandleType
+	from aiogram_middlewares.utils import BaseSerializer
 
 	from .models import RateData
 
@@ -51,7 +50,7 @@ class AssembleInit:
 		self, *,
 		period_sec: PositiveInt = 3, after_handle_count: PositiveInt = 1,
 		warnings_count: PositiveInt = 2,
-		cache_serializer: BaseSerializer = NullSerializer,
+		data_serializer: BaseSerializer | None = None,
 
 		cooldown_message: str | None = 'Calm down!',
 		calmed_message: str | None = 'You can chat now',
@@ -68,7 +67,7 @@ class AssembleInit:
 		if RaterSerializable in mro:
 			RaterSerializable.__init__(
 				self,
-				cache_serializer=cache_serializer,
+				data_serializer=data_serializer,
 			)
 
 		if RateDebouncable in mro:
@@ -122,7 +121,7 @@ class RaterAssembler:
 		logger.debug('Assembling <%s> Args: %s', bound.__name__, str(kwargs))
 		bases: list[type] = [bound, AssembleInit]
 
-		if not isinstance(kwargs.get('cache_serializer'), (NullSerializer, type(None))):
+		if kwargs.get('data_serializer') is not None:
 			bases.append(RaterSerializable)
 
 		# FIXME: Recheck! & queuing..
@@ -158,7 +157,8 @@ class RaterAssembler:
 
 
 # Pass class
-def assemble_rater(bound: object, **kwargs):
+# TODO: Hints..
+def assemble_rater(bound: object, **kwargs: Any) -> partial[RaterAssembler]:
 	return partial(RaterAssembler, bound=bound, **kwargs)
 
 
@@ -176,7 +176,7 @@ class RateMiddleware(RaterAttrsABC, BaseMiddleware):
 		event_user: User = data['event_from_user']
 		bot: Bot = data['bot']
 
-		event_user_throttling_data: RateData | None = await self._cache.get(event_user.id)
+		event_user_throttling_data: RateData | None = self._cache.get(event_user.id)
 		throttling_data: RateData = await self.trigger(
 			event_user_throttling_data, event_user, self.period_sec, bot,
 		)

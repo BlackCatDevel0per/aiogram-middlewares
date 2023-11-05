@@ -5,20 +5,17 @@ from abc import ABC, abstractmethod
 from inspect import signature as inspect_signature
 from typing import TYPE_CHECKING
 
-from aiocache import Cache
-from aiocache.serializers import NullSerializer
-
-from aiogram_middlewares.caches import AdvancedSimpleMemoryCache
-
+from .caches import LazyMemoryCache, LazyMemoryCacheSerializable
 from .models import RateData
 
 if TYPE_CHECKING:
 	from typing import Any, Callable, TypeVar
 
-	from aiocache.serializers import BaseSerializer
 	from aiogram import Bot
 	from aiogram.types import Update, User
 	from pydantic.types import PositiveInt
+
+	from utils import BaseSerializer
 
 	from .types import (
 		_TD,
@@ -37,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 class RaterAttrsABC(ABC):
-	_cache: AdvancedSimpleMemoryCache
+	_cache: LazyMemoryCache
 	period_sec: PositiveInt
 	after_handle_count: PositiveInt
 
@@ -51,7 +48,7 @@ class RaterAttrsABC(ABC):
 	# For serializer
 	_middleware: _ThrottleMiddlewareMethod
 	choose_cache: Callable[[_TI], RaterBase]
-	_make_cache: Callable[[int, BaseSerializer], AdvancedSimpleMemoryCache]
+	_make_cache: Callable[[int, BaseSerializer], LazyMemoryCache]
 
 
 # FIXME: Hints.. Annotations clses..
@@ -81,7 +78,7 @@ class RaterABC(RaterAttrsABC):
 
 class RaterBase(RaterABC):
 
-	_cache: AdvancedSimpleMemoryCache = None  # type: ignore
+	_cache: LazyMemoryCache = None  # type: ignore
 
 	def __init__(
 		self: RaterBase,
@@ -103,7 +100,7 @@ class RaterBase(RaterABC):
 		self.after_handle_count = after_handle_count
 
 		# FIXME: Mb move to cache choose part.. 
-		self._cache: AdvancedSimpleMemoryCache = self._make_cache(period_sec)
+		self._cache: LazyMemoryCache = self._make_cache(period_sec)
 
 		# For unity cache for all instances
 		#
@@ -152,14 +149,17 @@ class RaterBase(RaterABC):
 
 	##
 	def _make_cache(
-		self: RaterBase, period_sec: int, cache_serializer: BaseSerializer = NullSerializer,
-	) -> AdvancedSimpleMemoryCache:
-		return Cache(  # FIXME: Correct type hint??
-			cache_class=AdvancedSimpleMemoryCache,
-			ttl=period_sec,  # FIXME: Arg name..
-			# WARNING: If you use disk storage and program will fail,
-			# some items could be still store in memory!
-			serializer=cache_serializer(),  # TODO: ...
+		self: RaterBase, period_sec: int, data_serializer: BaseSerializer | None = None,
+	) -> LazyMemoryCache:
+		if data_serializer:
+			return LazyMemoryCacheSerializable(
+				ttl=period_sec,  # FIXME: Arg name..
+				# WARNING: If you use disk storage and program will fail,
+				# some items could be still store in memory!
+				data_serializer=data_serializer(),  # TODO: ... & move serializers to different place..
+			)
+		return LazyMemoryCache(
+			ttl=period_sec,
 		)
 
 
@@ -207,7 +207,7 @@ class RaterBase(RaterABC):
 			# (`Cache.add` does the same, but with checking in cache..)
 			# TODO: Mb make custom variant for that..
 			# TODO: Clean cache on exceptions.. (to avoid mutes..)
-			await self._cache.set(
+			self._cache.set(
 				event_user.id, rater_data,
 				ttl,
 			)

@@ -64,7 +64,7 @@ class RateLimiter(RaterAttrsABC, Filter):
 
 		event_user_throttling_data: RateData | None = await self._cache.get(event_user.id)
 		throttling_data: RateData = await self.trigger(
-			event_user_throttling_data, event_user, self.period_sec, bot,
+			event_user_throttling_data, event_user, self.period_sec, bot,  # FIXME: Args..
 		)
 		del event_user_throttling_data
 

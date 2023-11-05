@@ -104,7 +104,6 @@ exclude = [
     "docs",
     "tests",
     "dev",
-    "scripts",
     "*.egg-info",
 ]
 target-version = "py38"
@@ -117,7 +116,6 @@ indent-style = "tab"
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
-aiocache = "^0.12.2"
 brotli = {version = "^1.1.0", optional = true}
 aiogram = "^3.1.1"
 

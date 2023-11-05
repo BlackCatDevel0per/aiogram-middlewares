@@ -88,6 +88,7 @@ class RateNotifyCooldown(RaterNotifyBase):
 		# try send warning (run times from `warning_count`)
 		if is_not_exceed_warnings:
 			# [Optional] Will call: just warning and optional calmed notify (on end)
+			# TODO: Run in task..?
 			await self.try_user_warning(rate_data, event_user, bot)
 
 			rate_data.sent_warning_count += 1
@@ -128,7 +129,7 @@ class RateNotifyCalmed(RaterNotifyBase):
 		bot: Bot,
 	) -> None:
 		"""Call: On item in cache die - send message to user."""
-		await self._cache.set_sub_handler(
+		self._cache.set_handle_subcallback(
 			event_user.id,
 			# plug awaitable
 			lambda: bot.send_message(chat_id=event_user.id, text=self.calmed_message),

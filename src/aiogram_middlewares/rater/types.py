@@ -9,8 +9,7 @@ if TYPE_CHECKING:
 	from aiogram import Bot
 	from aiogram.types import Update, User
 
-	from aiogram_middlewares.caches import _ASMCLazyBackend
-
+	from .caches import _ASMCLazyBackend
 	from .models import RateData
 
 	# Outer (on handlers): TelegramEventObserver.trigger
@@ -51,20 +50,21 @@ if TYPE_CHECKING:
 	PluggedAwaitable = Callable[[], Awaitable]
 	_ASMCLazyBackend_ins = _ASMCLazyBackend
 	_conn_type = Union[_ASMCLazyBackend, None]
-	opt_ttl = Optional[int]
+	ttl_type = Union[int, float]
+	opt_ttl_type = Optional[Union[int, float]]
 
 	_status_type = Union[bool, int]
 
 	AsyncHandlable = Callable[
 		[
-			_ASMCLazyBackend_ins, Any, PluggedAwaitable, opt_ttl,
-			TimerHandle, float, _conn_type,
+			_ASMCLazyBackend_ins, Any, PluggedAwaitable, opt_ttl_type,
+			TimerHandle, _conn_type,
 		],
 		Awaitable[_status_type],
 	]
 	WrappedHandlable = Callable[
 		[
-			_ASMCLazyBackend_ins, Any, PluggedAwaitable, opt_ttl, _conn_type,
+			_ASMCLazyBackend_ins, Any, PluggedAwaitable, opt_ttl_type, _conn_type,
 		],
 		Awaitable[Union[bool, int]],
 	]

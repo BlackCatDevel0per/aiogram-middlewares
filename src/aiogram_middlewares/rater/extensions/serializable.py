@@ -9,11 +9,11 @@ if TYPE_CHECKING:
 
 	from typing import Any
 
-	from aiocache.serializers import BaseSerializer
 	from aiogram import Bot
 	from aiogram.types import Update, User
 
 	from aiogram_middlewares.rater.types import HandleData, HandleType
+	from aiogram_middlewares.utils import BaseSerializer
 
 	from .models import RateData
 
@@ -27,10 +27,10 @@ class RaterSerializable(RaterAttrsABC):
 
 	def __init__(
 		self: RaterSerializable,
-		cache_serializer: BaseSerializer,
+		data_serializer: BaseSerializer,
 	) -> None:
 		del self._cache  ##
-		self._cache = self._make_cache(self.period_sec, cache_serializer)
+		self._cache = self._make_cache(self.period_sec, data_serializer)
 		self.choose_cache(RaterSerializable)
 
 	async def middleware(
@@ -48,7 +48,5 @@ class RaterSerializable(RaterAttrsABC):
 			handle, event, event_user, data, bot, rater_data,
 		)
 		# Just update value without changing ttl
-		# P.S. Why aiocache's api doesn't has separate func for it?
-		# But `SENTINEL` well solution (but value stores without ttl aka FOREVER!) =)
-		await self._cache.update(event_user.id, rater_data)
+		self._cache.update(event_user.id, rater_data)
 		return result

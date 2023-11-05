@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import sys
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pickle import DEFAULT_PROTOCOL
 from pickle import dumps as pickle_dumps
 from pickle import loads as pickle_loads
 from typing import TYPE_CHECKING
 
-from aiocache.serializers import BaseSerializer
 from brotli import compress as brotli_compress
 from brotli import decompress as brotli_decompress
 
@@ -32,6 +32,16 @@ def make_dataclass(*args: Any, **kwargs: Any):  # noqa: F811,ANN201
 	return dataclass(*args, **kwargs)
 
 
+class BaseSerializer(ABC):
+	@abstractmethod
+	def serialize(self: BaseSerializer, value: object) -> bytes:
+		raise NotImplementedError
+
+	@abstractmethod
+	def deserialize(self: BaseSerializer, value: bytes) -> object:
+		raise NotImplementedError
+
+
 # TODO: Move it to different lib..
 # My brotlidded-pickle serializer UwU
 class BrotliedPickleSerializer(BaseSerializer):
@@ -51,11 +61,11 @@ class BrotliedPickleSerializer(BaseSerializer):
 		# TODO: More options..
 		self.pickle_protocol = pickle_protocol
 
-	def dumps(self: BrotliedPickleSerializer, value: object) -> bytes:
+	def serialize(self: BrotliedPickleSerializer, value: object) -> bytes:
 		"""Serialize the received value using ``pickle.dumps`` and compresses using brotli."""
 		return brotli_compress(pickle_dumps(value, protocol=self.pickle_protocol))
 
-	def loads(self: BrotliedPickleSerializer, value: bytes) -> object:
+	def deserialize(self: BrotliedPickleSerializer, value: bytes) -> object:
 		"""Decompresses using brotli & deserialize value using ``pickle.loads``."""
 		if value is None:
 			return None

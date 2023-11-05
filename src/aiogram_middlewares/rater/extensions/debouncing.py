@@ -27,5 +27,5 @@ class RateDebouncable(RaterAttrsABC):
 		"""Debouncing."""
 		throttling_data = await self._trigger(throttling_data, event_user, ttl, bot)
 		# Reset ttl for item (topping/debouncing)
-		await self._cache.expire(event_user.id, ttl)
+		self._cache.expire(event_user.id, ttl)
 		return throttling_data

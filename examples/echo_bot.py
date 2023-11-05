@@ -28,7 +28,7 @@ dp.update.outer_middleware(
 		# topping_up=False,  # it breaks through a bit -_-
 		# cooldown_message=None,
 		# calmed_message=None,
-		cache_serializer=BrotliedPickleSerializer,
+		data_serializer=BrotliedPickleSerializer,
 	),
 )
 
@@ -39,7 +39,7 @@ dp.update.outer_middleware(
 		period_sec=15, after_handle_count=2,
 		# topping_up=False,
 		# calmed_message=None,  # Because we don't want more messages)
-		# cache_serializer=BrotliedPickleSerializer,
+		# data_serializer=BrotliedPickleSerializer,
 	),
 )
 async def help_handler(message: types.Message) -> None:

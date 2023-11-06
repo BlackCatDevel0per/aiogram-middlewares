@@ -41,12 +41,12 @@ class RateLimiter(RaterAttrsABC, Filter):
 	async def proc_handle(
 		self: RateLimiter,
 		handle: None,  # type: ignore  # noqa: ARG002
-		throttling_data: RateData, counter: RateDataCounterAttrType,
+		throttling_data: RateData,
 		event: Update, event_user: User, data: dict[str, Any],  # noqa: ARG002
 	) -> bool:
 		#
 		"""Process handle's update."""
-		throttling_data.update_counter(counter)
+		throttling_data.rate += 1
 		# TODO: Mb log handle's name..
 		logger.debug(
 			'[%s] Handle user (proc): %s',

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from abc import ABC, abstractmethod
 from inspect import signature as inspect_signature
@@ -9,6 +10,7 @@ from .caches import LazyMemoryCache, LazyMemoryCacheSerializable
 from .models import RateData
 
 if TYPE_CHECKING:
+	from asyncio import AbstractEventLoop
 	from typing import Any, Callable, TypeVar
 
 	from aiogram import Bot
@@ -20,7 +22,6 @@ if TYPE_CHECKING:
 	from .types import (
 		_TD,
 		HandleType,
-		RateDataCounterAttrType,
 		_BaseThrottleMethod,
 		_ProcHandleMethod,
 		_ThrottleMiddlewareMethod,
@@ -39,6 +40,8 @@ class RaterAttrsABC(ABC):
 	after_handle_count: PositiveInt
 
 	is_cache_unity: bool
+
+	_loop: AbstractEventLoop
 
 
 	##
@@ -60,7 +63,7 @@ class RaterABC(RaterAttrsABC):
 		event_user: User, ttl: int, bot: Bot,
 	) -> RateData | _TD:
 		raise NotImplementedError
-		return rater_data or RateData(rate=0, sent_warning_count=0)
+		return rater_data or RateData()
 
 
 	@abstractmethod
@@ -84,7 +87,10 @@ class RaterBase(RaterABC):
 		self: RaterBase,
 		period_sec: PositiveInt, after_handle_count: PositiveInt, *,
 
+		data_serializer: BaseSerializer | None = None,
 		is_cache_unity: bool,  # Because will trigger twice with filters cache.
+
+		loop: AbstractEventLoop | None = None,
 	) -> None:
 		# TODO: More docstrings!!!
 		# TODO: Cache autocleaner schedule (if during work had network glitch or etc.)
@@ -100,11 +106,12 @@ class RaterBase(RaterABC):
 		self.after_handle_count = after_handle_count
 
 		# FIXME: Mb move to cache choose part.. 
-		self._cache: LazyMemoryCache = self._make_cache(period_sec)
+		self._cache: LazyMemoryCache = self._make_cache(period_sec, data_serializer)
 
 		# For unity cache for all instances
 		#
 		self.__is_cache_unity = is_cache_unity
+		self._loop = loop if loop else asyncio.get_event_loop()##
 		self.choose_cache(RaterBase)
 
 
@@ -202,7 +209,7 @@ class RaterBase(RaterABC):
 				'[%s] Handle user (begin): %s',
 				self.__class__.__name__, event_user.username,
 			)
-			rater_data = RateData(rate=0, sent_warning_count=0)##def
+			rater_data = RateData()
 			# Add new item to cache with ttl from initializator.
 			# (`Cache.add` does the same, but with checking in cache..)
 			# TODO: Mb make custom variant for that..
@@ -217,11 +224,11 @@ class RaterBase(RaterABC):
 	async def proc_handle(
 		self: RaterBase,
 		handle: HandleType,
-		rater_data: RateData, counter: RateDataCounterAttrType,
+		rater_data: RateData,
 		event: Update, event_user: User, data: dict[str, Any],
 	) -> Any:
 		"""Process handle's update."""
-		rater_data.update_counter(counter)
+		rater_data.rate += 1
 		# TODO: Mb log handle's name..
 		logger.debug(
 			'[%s] Handle user (proc): %s',
@@ -263,7 +270,7 @@ class RaterBase(RaterABC):
 			# count up rate & proc
 			# FIXME: Rename..
 			return await self.proc_handle(
-				handle, rater_data, 'rate', event, event_user,
+				handle, rater_data, event, event_user,
 				data,
 			)
 

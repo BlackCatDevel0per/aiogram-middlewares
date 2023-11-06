@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from aiogram_middlewares.utils import BrotliedPickleSerializer, make_dataclass
 
 if TYPE_CHECKING:
-	from asyncio import BaseEventLoop, Task, TimerHandle
+	from asyncio import AbstractEventLoop, Task, TimerHandle
 	from dataclasses import dataclass as make_dataclass
 	from typing import Any, Callable
 
@@ -15,10 +15,7 @@ if TYPE_CHECKING:
 
 	# TODO: Move types to other place..
 	from .rater.types import (
-		AsyncHandlable,
 		PluggedAwaitable,
-		WrappedHandlable,
-		opt_ttl_type,
 		ttl_type,
 	)
 
@@ -27,6 +24,8 @@ if TYPE_CHECKING:
 
 @make_dataclass
 class CacheItem:
+	"""Dataclass for timer with value data."""
+
 	handle: TimerHandle
 	value: Any = None
 
@@ -36,18 +35,22 @@ _NO_ITEM = object()
 
 
 class LazyMemoryCache:
-	"""Async wrapper around dict operations to use it as a ttl cache."""
+	"""Async wrapper around dict operations & event loop timers to use it as a ttl cache."""
 
-	def __init__(self: LazyMemoryCache, ttl: ttl_type, loop: BaseEventLoop | None = None) -> None:
+	def __init__(
+		self: LazyMemoryCache, ttl: ttl_type,
+		loop: AbstractEventLoop | None = None,
+	) -> None:
 		self._cache: dict[Any, CacheItem] = {}
 		self._ttl = ttl
 
-		self._loop = loop or asyncio.get_event_loop()
+		self._loop = loop if loop else asyncio.get_event_loop()
 
 
 	def _make_handle(
 		self: LazyMemoryCache, ttl: ttl_type, callback: Callable[..., Any], *args: Any,
 	) -> TimerHandle:
+		"""Wrap around asyncio event loop's `call_later` method."""
 		return self._loop.call_later(ttl, callback, *args)
 
 
@@ -166,7 +169,7 @@ class LazyMemoryCacheSerializable(LazyMemoryCache):
 
 	def __init__(
 		self: LazyMemoryCacheSerializable, ttl: ttl_type,
-		loop: BaseEventLoop | None = None,
+		loop: AbstractEventLoop | None = None,
 		data_serializer: BaseSerializer | None = None,
 	) -> None:
 		super().__init__(ttl=ttl, loop=loop)
@@ -179,7 +182,7 @@ class LazyMemoryCacheSerializable(LazyMemoryCache):
 		ttl: ttl_type,
 	) -> bool:
 		# ttl must not be zero!
-		return super().set(key, self._serializer.serialize(value), ttl)
+		return LazyMemoryCache.set(self, key, self._serializer.serialize(value), ttl)
 
 
 	def update(
@@ -187,7 +190,7 @@ class LazyMemoryCacheSerializable(LazyMemoryCache):
 		key: key_obj, value: Any,
 	) -> bool:
 		# ttl must not be zero!
-		return super().update(key, self._serializer.serialize(value))
+		return LazyMemoryCache.update(self, key, self._serializer.serialize(value))
 
 
 	def get(self: LazyMemoryCacheSerializable, key: key_obj, default: Any = None) -> Any:

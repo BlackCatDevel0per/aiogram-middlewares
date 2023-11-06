@@ -87,9 +87,9 @@ message = types.Message(
 						has_protected_content=None,
 						media_group_id=None,
 						author_signature=None,
-						text='/start',
+						# text='/start',
 						# text='/say',
-						# text='/say yoohoo!'*10,
+						text='/say ' + 'yoohoo!'*10,
 
 						entities=[
 							types.MessageEntity(

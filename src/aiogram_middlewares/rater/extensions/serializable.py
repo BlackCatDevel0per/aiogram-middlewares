@@ -12,40 +12,28 @@ if TYPE_CHECKING:
 	from aiogram import Bot
 	from aiogram.types import Update, User
 
-	from aiogram_middlewares.rater.types import HandleData, HandleType
-	from aiogram_middlewares.utils import BaseSerializer
-
-	from .models import RateData
+	from aiogram_middlewares.rater.types import HandleData, HandleType, RateData
 
 
 logger = logging.getLogger(__name__)
 
-# TODO: Conditional inhetirating..
 
+class RateSerializable(RaterAttrsABC):
 
-class RaterSerializable(RaterAttrsABC):
-
-	def __init__(
-		self: RaterSerializable,
-		data_serializer: BaseSerializer,
-	) -> None:
-		del self._cache  ##
-		self._cache = self._make_cache(self.period_sec, data_serializer)
-		self.choose_cache(RaterSerializable)
 
 	async def middleware(
-		self: RaterSerializable,
+		self: RateSerializable,
 		handle: HandleType,
 		event: Update,
 		event_user: User,
 		data: HandleData,
 		bot: Bot,
 		rater_data: RateData,
-	) -> Any:
+	) -> Any | None:
 		"""Handle if custom serializer is available."""
-		##
 		result = await self._middleware(
-			handle, event, event_user, data, bot, rater_data,
+			handle, event, event_user, data, bot,
+			rater_data,
 		)
 		# Just update value without changing ttl
 		self._cache.update(event_user.id, rater_data)

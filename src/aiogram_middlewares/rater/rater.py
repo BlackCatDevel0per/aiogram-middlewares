@@ -9,13 +9,17 @@ from aiogram import BaseMiddleware
 from .base import RaterAttrsABC, RaterBase
 from .extensions import (
 	RateDebouncable,
+	RateNotifyBase,
 	RateNotifyCalmed,
 	RateNotifyCC,
 	RateNotifyCooldown,
-	RaterSerializable,
+	RateSerializable,
+	RateThrottleBase,
+	RateThrottleNotifyBase,
 )
 
 if TYPE_CHECKING:
+	from asyncio import AbstractEventLoop
 	from typing import Any
 
 	from aiogram import Bot
@@ -57,21 +61,16 @@ class AssembleInit:
 
 		topping_up: bool = True,  # noqa: ARG002
 		is_cache_unity: bool = False,  # Because will throttle twice with filters cache.
-	):
+		loop: AbstractEventLoop | None = None,
+	) -> None:
 		mro = self.__class__.__mro__
 		RaterBase.__init__(
 			self,
 			period_sec=period_sec, after_handle_count=after_handle_count,
+			data_serializer=data_serializer,
 			is_cache_unity=is_cache_unity,
+			loop=loop,
 		)
-		if RaterSerializable in mro:
-			RaterSerializable.__init__(
-				self,
-				data_serializer=data_serializer,
-			)
-
-		if RateDebouncable in mro:
-			RateDebouncable.__init__(self)
 
 		if RateNotifyCC in mro:
 			RateNotifyCC.__init__(
@@ -104,9 +103,19 @@ class AssembleInit:
 			)
 
 
+def make_class_on(
+	name: str | None = None, bases: tuple[type, ...] = (), dt: dict[str, Any] = {}
+) -> type:
+	"""Wrap type func for dynamically making class with inheritance."""
+	if not name:
+		name = bases[0].__name__
+	return type(name, bases, dt)
+
+
 # Assemble throttling
 class RaterAssembler:
 
+	# TODO: Mb cache & move this stuff..
 	def __new__(
 		cls: type, **kwargs: Any,  #~
 	):
@@ -121,19 +130,40 @@ class RaterAssembler:
 		logger.debug('Assembling <%s> Args: %s', bound.__name__, str(kwargs))
 		bases: list[type] = [bound, AssembleInit]
 
-		if kwargs.get('data_serializer') is not None:
-			bases.append(RaterSerializable)
+		throttling_mode: bool = kwargs.pop('throttling_mode', False)
+		rnb = RateNotifyBase if not throttling_mode else RateThrottleNotifyBase
+		log__is_throttle_notify = lambda: logger.debug(  # noqa: E731
+			'Throttling mode enabled, notifications will based on `%s`',
+			RateThrottleNotifyBase.__name__,
+		)
+
+		if kwargs.get('data_serializer', _NO_SET) is not None:
+			bases.append(RateSerializable)
 
 		# FIXME: Recheck! & queuing..
 		# FIXME: warnings_count
 		if kwargs.get('cooldown_message', _NO_SET) is not None and \
 			kwargs.get('calmed_message', _NO_SET) is not None:
-			bases.append(RateNotifyCC)
+			# TODO: Make func/meta for this stuff..
+			rncc = make_class_on(bases=(RateNotifyCC, rnb))
+			log__is_throttle_notify()
+			bases.append(rncc)
 		##
 		elif kwargs.get('cooldown_message', _NO_SET) is not None:
-			bases.append(RateNotifyCooldown)
+			rnc = make_class_on(bases=(RateNotifyCooldown, rnb))
+			log__is_throttle_notify()
+			bases.append(rnc)
 		elif kwargs.get('calmed_message', _NO_SET) is not None:
-			bases.append(RateNotifyCalmed)
+			rncd = make_class_on(bases=(RateNotifyCalmed, rnb))
+			log__is_throttle_notify()
+			bases.append(rncd)
+
+		elif throttling_mode:
+			logger.debug(
+				'Throttling mode enabled, middleware will based on %s',
+				RateThrottleBase.__name__,
+			)
+			bases.append(RateThrottleBase)
 
 		if kwargs.pop('topping_up', _NO_SET):
 			bases.append(RateDebouncable)
@@ -152,7 +182,7 @@ class RaterAssembler:
 			bound.__name__,
 			f"[{', '.join(c.__name__ for c in _bases)}]",
 		)
-		obj = type(bound.__name__, _bases, {})
+		obj = make_class_on(bases=_bases)
 		return obj(**kwargs)
 
 
@@ -160,26 +190,3 @@ class RaterAssembler:
 # TODO: Hints..
 def assemble_rater(bound: object, **kwargs: Any) -> partial[RaterAssembler]:
 	return partial(RaterAssembler, bound=bound, **kwargs)
-
-
-@assemble_rater
-class RateMiddleware(RaterAttrsABC, BaseMiddleware):
-	"""Rater middleware (usually for outer usage)."""
-
-	async def __call__(
-		self: RateMiddleware,
-		handle: HandleType,
-		event: Update,
-		data: HandleData,
-	) -> Any:
-		"""Callable for routers/dispatchers."""
-		event_user: User = data['event_from_user']
-		bot: Bot = data['bot']
-
-		event_user_throttling_data: RateData | None = self._cache.get(event_user.id)
-		throttling_data: RateData = await self.trigger(
-			event_user_throttling_data, event_user, self.period_sec, bot,
-		)
-		del event_user_throttling_data
-
-		return await self.middleware(handle, event, event_user, data, bot, throttling_data)

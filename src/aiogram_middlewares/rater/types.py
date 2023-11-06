@@ -38,10 +38,9 @@ if TYPE_CHECKING:
 		[Union[_TD, None], User, int, Bot], Awaitable[Union[RateData, _TD]],
 	]
 
-	RateDataCounterAttrType = Literal['rate', 'sent_warning_count']
 	_ProcHandleMethod = Callable[
 		[
-			HandleType, RateData, RateDataCounterAttrType,
+			HandleType, RateData,
 			Update, User, HandleData,
 		], Any,
 	]

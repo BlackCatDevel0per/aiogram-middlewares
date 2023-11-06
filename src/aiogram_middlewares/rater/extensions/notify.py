@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from aiogram_middlewares.rater.base import RaterAttrsABC
@@ -23,12 +23,39 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class RaterNotifyBase(RaterAttrsABC):
+# NOTE: In current time only for antiflood..
+class RateMiddleABC(RaterAttrsABC, ABC):
+	"""Abstract for middle bases after trigger (abc for dynamic combination)."""
+
+	@abstractmethod
+	async def on_exceed_rate(
+		self: RateMiddleABC,
+		handle: HandleType,
+		rate_data: RateData, event: Update, event_user: User, data: HandleData,
+		bot: Bot,
+	) -> None:
+		raise NotImplementedError
+
+
+	@abstractmethod
+	async def _middleware(
+		self: RateMiddleABC,
+		handle: HandleType,
+		event: Update,
+		event_user: User,
+		data: HandleData,
+		bot: Bot,
+		rate_data: RateData,
+	) -> Any | None:
+		raise NotImplementedError
+
+
+class RateNotifyBase(RateMiddleABC):
 
 
 	@abstractmethod
 	async def on_exceed_rate(
-		self: RaterNotifyBase,
+		self: RateNotifyBase,
 		handle: HandleType,
 		rate_data: RateData, event: Update, event_user: User, data: HandleData,
 		bot: Bot,
@@ -37,7 +64,7 @@ class RaterNotifyBase(RaterAttrsABC):
 
 
 	async def _middleware(
-		self: RaterNotifyBase,
+		self: RateNotifyBase,
 		handle: HandleType,
 		event: Update,
 		event_user: User,
@@ -48,14 +75,14 @@ class RaterNotifyBase(RaterAttrsABC):
 		"""Main middleware."""
 		##
 		is_not_exceed_rate = self.after_handle_count > rate_data.rate
-		# TODO: Mb one more variant(s) for debug..
+		# TODO: Mb one more variant(s) for debug.. (better by decorators..)
 
 		# proc/pass update action while not exceed rate limit (run times limit from `after_handle_count`)
 		if is_not_exceed_rate:
 			# count up rate & proc
 			# FIXME: Remove useless counter param?
 			return await self.proc_handle(####
-				handle, rate_data, 'rate', event, event_user,
+				handle, rate_data, event, event_user,
 				data,
 			)
 
@@ -64,7 +91,7 @@ class RaterNotifyBase(RaterAttrsABC):
 
 
 # Cooldown
-class RateNotifyCooldown(RaterNotifyBase):
+class RateNotifyCooldown(RateMiddleABC):
 
 	def __init__(
 		self: RateNotifyCooldown,
@@ -114,7 +141,7 @@ class RateNotifyCooldown(RaterNotifyBase):
 
 
 # Calmed
-class RateNotifyCalmed(RaterNotifyBase):
+class RateNotifyCalmed(RateMiddleABC):
 
 	def __init__(
 		self: RateNotifyCalmed,

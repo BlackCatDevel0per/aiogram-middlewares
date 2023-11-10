@@ -9,15 +9,12 @@ from .base import RaterAttrsABC
 from .rater import assemble_rater
 
 if TYPE_CHECKING:
-	from asyncio import AbstractEventLoop
 	from typing import Any
 
 	from aiogram import Bot
 	from aiogram.types import Update, User
-	from pydantic.types import PositiveInt
 
 	from aiogram_middlewares.types import HandleData, HandleType
-	from aiogram_middlewares.utils import BaseSerializer
 
 	from .models import RateData
 

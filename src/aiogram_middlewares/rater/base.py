@@ -20,7 +20,8 @@ if TYPE_CHECKING:
 	from utils import BaseSerializer
 
 	from .types import (
-		_TD,
+		_RD,
+		HandleData,
 		HandleType,
 		_BaseThrottleMethod,
 		_ProcHandleMethod,
@@ -59,11 +60,11 @@ class RaterABC(RaterAttrsABC):
 
 	@abstractmethod
 	async def trigger(
-		self: RaterABC, rater_data: _TD | None,
+		self: RaterABC, rate_data: _RD | None,
 		event_user: User, ttl: int, bot: Bot,
-	) -> RateData | _TD:
+	) -> RateData | _RD:
 		raise NotImplementedError
-		return rater_data or RateData()
+		return rate_data or RateData()
 
 
 	@abstractmethod
@@ -72,9 +73,9 @@ class RaterABC(RaterAttrsABC):
 		handle: HandleType,
 		event: Update,
 		event_user: User,
-		data: dict[str, Any],
+		data: HandleData,
 		bot: Bot,
-		rater_data: RateData,
+		rate_data: RateData,
 	) -> Any:
 		raise NotImplementedError
 
@@ -95,8 +96,13 @@ class RaterBase(RaterABC):
 		# TODO: More docstrings!!!
 		# TODO: Cache autocleaner schedule (if during work had network glitch or etc.)
 		# TODO: Mb rename topping to debouncing..
-		assert period_sec >= 1, '`period` must be positive!'
-		assert after_handle_count >= 1, '`after_handle_count` must be positive!'
+		if period_sec <= 1:
+			msg = '`period` must be positive!'
+			raise ValueError(msg)
+
+		if after_handle_count <= 1:
+			msg = '`after_handle_count` must be positive!'
+			raise ValueError(msg)
 
 		if period_sec < 3:  # noqa: PLR2004
 			# recommended to set above 3 for period..
@@ -124,7 +130,7 @@ class RaterBase(RaterABC):
 		sign: tuple[str, ...] = tuple(inspect_signature(self.__init__).parameters)
 		attrs: list[str] = [attr for attr in sign if getattr(self, attr, None)]
 		del sign
-		self_attrs: dict[str, Any] = {attr: getattr(self, attr) for attr in attrs}
+		self_attrs: HandleData = {attr: getattr(self, attr) for attr in attrs}
 		MAX_LEN = 16
 		for name, attr in self_attrs.items():
 			if isinstance(attr, (str, list)):
@@ -192,43 +198,45 @@ class RaterBase(RaterABC):
 
 
 	async def trigger(
-		self: RaterBase, rater_data: _TD | None,
+		self: RaterBase, rate_data: _RD | None,
 		event_user: User, ttl: int, bot: Bot,
-	) -> RateData | _TD:
-		return await self._trigger(rater_data, event_user, ttl, bot)
+	) -> RateData | _RD:
+		return await self._trigger(rate_data, event_user, ttl, bot)
 
 
 	async def _trigger(
-		self: RaterBase, rater_data: _TD | None,
+		self: RaterBase, rate_data: _RD | None,
 		event_user: User, ttl: int, bot: Bot,  # noqa: ARG002
-	) -> RateData | _TD:
+	) -> RateData | _RD:
 		"""Antiflood.."""
 		# Runs at first trigger to create entity, else returns data (counters)
-		if not rater_data:
+		if not rate_data:
 			logger.debug(
 				'[%s] Handle user (begin): %s',
 				self.__class__.__name__, event_user.username,
 			)
-			rater_data = RateData()
+
+			rate_data = RateData()
 			# Add new item to cache with ttl from initializator.
 			# (`Cache.add` does the same, but with checking in cache..)
 			# TODO: Mb make custom variant for that..
 			# TODO: Clean cache on exceptions.. (to avoid mutes..)
 			self._cache.set(
-				event_user.id, rater_data,
-				ttl,
+				event_user.id, rate_data,
+				ttl=ttl,
 			)
-		return rater_data
+		assert rate_data is not None  # plug for linter
+		return rate_data
 
 
 	async def proc_handle(
 		self: RaterBase,
 		handle: HandleType,
-		rater_data: RateData,
-		event: Update, event_user: User, data: dict[str, Any],
+		rate_data: RateData,
+		event: Update, event_user: User, data: HandleData,
 	) -> Any:
 		"""Process handle's update."""
-		rater_data.rate += 1
+		rate_data.rate += 1
 		# TODO: Mb log handle's name..
 		logger.debug(
 			'[%s] Handle user (proc): %s',
@@ -243,11 +251,11 @@ class RaterBase(RaterABC):
 		handle: HandleType,
 		event: Update,
 		event_user: User,
-		data: dict[str, Any],
+		data: HandleData,
 		bot: Bot,
-		rater_data: RateData,
+		rate_data: RateData,
 	) -> Any | None:
-		return await self._middleware(handle, event, event_user, data, bot, rater_data)
+		return await self._middleware(handle, event, event_user, data, bot, rate_data)
 
 
 	async def _middleware(
@@ -255,22 +263,22 @@ class RaterBase(RaterABC):
 		handle: HandleType,
 		event: Update,
 		event_user: User,
-		data: dict[str, Any],
+		data: HandleData,
 		bot: Bot,
-		rater_data: RateData,
+		rate_data: RateData,
 	) -> Any | None:
 		"""Main middleware."""
 		# TODO: Mb one more variant(s) for debug..
 
 		# TODO: Data types variants..
-		is_not_exceed_rate = self.after_handle_count > rater_data.rate
+		is_not_exceed_rate = self.after_handle_count > rate_data.rate
 
 		# proc/pass update action (run times from `after_handle_amount`)
 		if is_not_exceed_rate:
 			# count up rate & proc
 			# FIXME: Rename..
 			return await self.proc_handle(
-				handle, rater_data, event, event_user,
+				handle, rate_data, event, event_user,
 				data,
 			)
 

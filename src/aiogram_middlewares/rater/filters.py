@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 	from aiogram.types import Update, User
 
 	from .models import RateData
-	from .types import RateDataCounterAttrType
+	from .types import HandleData
 
 	ThrottleFilterMiddleware = Callable[
 		[
@@ -42,7 +42,7 @@ class RateLimiter(RaterAttrsABC, Filter):
 		self: RateLimiter,
 		handle: None,  # type: ignore  # noqa: ARG002
 		throttling_data: RateData,
-		event: Update, event_user: User, data: dict[str, Any],  # noqa: ARG002
+		event: Update, event_user: User, data: HandleData,  # noqa: ARG002
 	) -> bool:
 		#
 		"""Process handle's update."""
@@ -62,7 +62,7 @@ class RateLimiter(RaterAttrsABC, Filter):
 	) -> bool:
 		event_user: User = update.from_user
 
-		event_user_throttling_data: RateData | None = await self._cache.get(event_user.id)
+		event_user_throttling_data: RateData | None = self._cache.get(event_user.id)
 		throttling_data: RateData = await self.trigger(
 			event_user_throttling_data, event_user, self.period_sec, bot,  # FIXME: Args..
 		)

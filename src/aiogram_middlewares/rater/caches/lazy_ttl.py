@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress as exception_suppress
 from time import perf_counter
 from typing import TYPE_CHECKING
 
@@ -26,12 +27,14 @@ if TYPE_CHECKING:
 class CacheItem:
 	"""Dataclass for timer with value data."""
 
-	handle: TimerHandle
-	value: Any = None
+	handle: TimerHandle  # Timer for ttl & some actions..
+	value: Any = None  # Serializable data
+	obj: object = None  # Not serializable field
 
 
 _NO_ITEM = object()
 # TODO: Make some args as objects..
+# TODO: Add set/update method without ttl for things like throttle?
 
 
 class LazyMemoryCache:
@@ -60,21 +63,30 @@ class LazyMemoryCache:
 
 	def set(
 		self: LazyMemoryCache,
-		key: key_obj, value: Any,
-		ttl: ttl_type,
+		key: key_obj, value: Any, obj: object = None,
+		ttl: ttl_type = 10,
 	) -> bool:
 		# ttl must not be zero!
 		# Not cancels old item handle!
 		handle: TimerHandle = self._make_handle_delete(key, ttl)
-		item = CacheItem(value=value, handle=handle)
+		item = CacheItem(value=value, handle=handle, obj=obj)
 		self._cache[key] = item
 		return True
 
 
-	def get(self: LazyMemoryCache, key: key_obj, default: Any = None) -> Any:
+	def get_item(self: LazyMemoryCache, key: key_obj, default: Any = None) -> Any | None:
+		return self._cache.get(key, CacheItem) or default
+
+
+	def get(self: LazyMemoryCache, key: key_obj, default: Any = None) -> Any | None:
 		return self._cache.get(key, CacheItem).value or default
 
 
+	def get_obj(self: LazyMemoryCache, key: key_obj, default: Any = None) -> Any | None:
+		return self._cache.get(key, CacheItem).obj or default
+
+
+	# unused..
 	def store(
 		self: LazyMemoryCache,
 		key: key_obj, value: Any,
@@ -82,12 +94,32 @@ class LazyMemoryCache:
 		return self.set(key, value, self._ttl)
 
 
+	# TODO: Mb add obj arg.. (don't forget to pass arg into serializable variant too..)
 	def update(
 		self: LazyMemoryCache, key: key_obj, value: Any,
 	) -> bool:
 		# Doesn't cancels handler task =)
 		self._cache[key].value = value
 		return True
+
+
+	def uppress(
+		self: LazyMemoryCache, key: key_obj, value: Any,
+	) -> bool:
+		"""Like update, but ignore KeyError exception."""
+		with exception_suppress(KeyError):
+			return self.update(key, value)
+		return False
+
+
+	# unused..
+	def upsert(
+		self: LazyMemoryCache, key: key_obj, value: Any,
+		ttl: ttl_type = 10,
+	) -> bool:
+		if key not in self._cache:
+			return self.set(key, value, ttl or self._ttl)
+		return self.update(key, value)
 
 
 	def delete(self: LazyMemoryCache, key: key_obj) -> bool:
@@ -166,6 +198,7 @@ class LazyMemoryCache:
 
 
 class LazyMemoryCacheSerializable(LazyMemoryCache):
+	"""Lazy cache wrapper to serialize/deserialize value data."""
 
 	def __init__(
 		self: LazyMemoryCacheSerializable, ttl: ttl_type,
@@ -178,11 +211,11 @@ class LazyMemoryCacheSerializable(LazyMemoryCache):
 
 	def set(
 		self: LazyMemoryCacheSerializable,
-		key: key_obj, value: Any,
-		ttl: ttl_type,
+		key: key_obj, value: Any, obj: object = None,
+		ttl: ttl_type = 10,
 	) -> bool:
 		# ttl must not be zero!
-		return LazyMemoryCache.set(self, key, self._serializer.serialize(value), ttl)
+		return super().set(key, self._serializer.serialize(value), obj, ttl)
 
 
 	def update(
@@ -190,7 +223,7 @@ class LazyMemoryCacheSerializable(LazyMemoryCache):
 		key: key_obj, value: Any,
 	) -> bool:
 		# ttl must not be zero!
-		return LazyMemoryCache.update(self, key, self._serializer.serialize(value))
+		return super().update(key, self._serializer.serialize(value))
 
 
 	def get(self: LazyMemoryCacheSerializable, key: key_obj, default: Any = None) -> Any:

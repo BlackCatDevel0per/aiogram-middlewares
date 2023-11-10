@@ -28,13 +28,13 @@ class RateSerializable(RaterAttrsABC):
 		event_user: User,
 		data: HandleData,
 		bot: Bot,
-		rater_data: RateData,
+		rate_data: RateData,
 	) -> Any | None:
 		"""Handle if custom serializer is available."""
 		result = await self._middleware(
 			handle, event, event_user, data, bot,
-			rater_data,
+			rate_data,
 		)
-		# Just update value without changing ttl
-		self._cache.update(event_user.id, rater_data)
+		# Just update value without changing ttl (if item was removed from cache - catch & do nothing)
+		self._cache.uppress(event_user.id, rate_data)
 		return result

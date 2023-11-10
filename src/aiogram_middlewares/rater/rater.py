@@ -4,17 +4,15 @@ import logging
 from functools import partial
 from typing import TYPE_CHECKING
 
-from aiogram import BaseMiddleware
-
-from .base import RaterAttrsABC, RaterBase
+from .base import RaterBase
 from .extensions import (
 	RateDebouncable,
 	RateNotifyBase,
 	RateNotifyCalmed,
 	RateNotifyCC,
 	RateNotifyCooldown,
+	RaterThrottleBase,
 	RateSerializable,
-	RateThrottleBase,
 	RateThrottleNotifyBase,
 )
 
@@ -22,14 +20,9 @@ if TYPE_CHECKING:
 	from asyncio import AbstractEventLoop
 	from typing import Any
 
-	from aiogram import Bot
-	from aiogram.types import Update, User
-	from pydantic.types import PositiveInt
-
-	from aiogram_middlewares.types import HandleData, HandleType
+	# TODO: Move types..
+	from aiogram_middlewares.rater.extensions.throttling.locks import PositiveFloat, PositiveInt
 	from aiogram_middlewares.utils import BaseSerializer
-
-	from .models import RateData
 
 
 logger = logging.getLogger(__name__)
@@ -62,6 +55,9 @@ class AssembleInit:
 		topping_up: bool = True,  # noqa: ARG002
 		is_cache_unity: bool = False,  # Because will throttle twice with filters cache.
 		loop: AbstractEventLoop | None = None,
+
+		# Throttle mode
+		sem_period: PositiveInt | PositiveFloat | None = None,
 	) -> None:
 		mro = self.__class__.__mro__
 		RaterBase.__init__(
@@ -69,8 +65,14 @@ class AssembleInit:
 			period_sec=period_sec, after_handle_count=after_handle_count,
 			data_serializer=data_serializer,
 			is_cache_unity=is_cache_unity,
-			loop=loop,
+			loop=loop,  ##@dep
 		)
+
+		if RaterThrottleBase in mro:
+			RaterThrottleBase.__init__(
+				self,
+				sem_period=sem_period,
+			)
 
 		if RateNotifyCC in mro:
 			RateNotifyCC.__init__(
@@ -137,7 +139,7 @@ class RaterAssembler:
 			RateThrottleNotifyBase.__name__,
 		)
 
-		if kwargs.get('data_serializer', _NO_SET) is not None:
+		if kwargs.get('data_serializer', _NO_SET) is not _NO_SET:
 			bases.append(RateSerializable)
 
 		# FIXME: Recheck! & queuing..
@@ -158,15 +160,17 @@ class RaterAssembler:
 			log__is_throttle_notify()
 			bases.append(rncd)
 
-		elif throttling_mode:
-			logger.debug(
-				'Throttling mode enabled, middleware will based on %s',
-				RateThrottleBase.__name__,
-			)
-			bases.append(RateThrottleBase)
 
 		if kwargs.pop('topping_up', _NO_SET):
 			bases.append(RateDebouncable)
+
+		if throttling_mode:
+			logger.debug(
+				'Throttling mode enabled, middleware will based on %s',
+				RaterThrottleBase.__name__,
+			)
+			bases.append(RaterThrottleBase)
+
 		bases.append(RaterBase)
 
 		_bases: tuple[type, ...] = tuple(bases)
@@ -177,6 +181,7 @@ class RaterAssembler:
 			msg = 'MRO has duplicates!'
 			raise TypeError(msg)
 
+		# TODO: Additional info in debug.. (inheritance)
 		logger.debug(
 			'MRO <%s>: %s',
 			bound.__name__,

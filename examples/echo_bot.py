@@ -24,17 +24,22 @@ dp = Dispatcher()
 
 dp.update.outer_middleware(
 	RateMiddleware(
+		throttling_mode=True,
+		sem_period=4,
+		topping_up=False,
+
 		period_sec=5, after_handle_count=1,
 		# topping_up=False,  # it breaks through a bit -_-
 		# cooldown_message=None,
 		# calmed_message=None,
-		data_serializer=BrotliedPickleSerializer,
+		# data_serializer=BrotliedPickleSerializer,
 	),
 )
 
 
 @dp.message(
 	Command('help'),
+
 	RateLimiter(
 		period_sec=15, after_handle_count=2,
 		# topping_up=False,

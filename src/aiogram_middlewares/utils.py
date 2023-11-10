@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 # Well..
 def make_dataclass(*args: Any, **kwargs: Any):  # noqa: F811,ANN201
 	"""Wrap around @dataclass decorator with python version check to pick kwargs."""
+	# TODO: Use `sys.version_info > (3, 10)`
 	pyv = (sys.version_info.major, sys.version_info.minor)
 	# TODO: More features..
 	defs = {

@@ -6,4 +6,4 @@ from .notify import (  # noqa: F401
     RateNotifyCooldown,
 )
 from .serializable import RateSerializable  # noqa: F401
-from .throttling import RateThrottleBase, RateThrottleNotifyBase  # noqa: F401
+from .throttling import RaterThrottleBase, RateThrottleNotifyBase  # noqa: F401

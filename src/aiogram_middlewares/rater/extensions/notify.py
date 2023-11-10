@@ -80,8 +80,7 @@ class RateNotifyBase(RateMiddleABC):
 		# proc/pass update action while not exceed rate limit (run times limit from `after_handle_count`)
 		if is_not_exceed_rate:
 			# count up rate & proc
-			# FIXME: Remove useless counter param?
-			return await self.proc_handle(####
+			return await self.proc_handle(
 				handle, rate_data, event, event_user,
 				data,
 			)
@@ -98,7 +97,9 @@ class RateNotifyCooldown(RateMiddleABC):
 		cooldown_message: str | None,
 		warnings_count: PositiveInt,
 	) -> None:
-		assert warnings_count >= 1, '`warnings_count` must be positive!'
+		if warnings_count >= 1:
+			msg = '`warnings_count` must be positive!'
+			raise ValueError(msg)
 
 		self.warnings_count = warnings_count
 		self.cooldown_message = cooldown_message

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 	from aiogram.types import Update, User
 
 	from .caches import _ASMCLazyBackend
-	from .models import RateData
+	from .models import RateData, ThrottleData
 
 	# Outer (on handlers): TelegramEventObserver.trigger
 	# Inner (per handler): HandlerObject.call
@@ -32,10 +32,10 @@ if TYPE_CHECKING:
 		], Any,
 	]
 
-	_TD = TypeVar('_TD', bound=RateData)
+	_RD = TypeVar('_RD', bound=RateData)
 
 	_BaseThrottleMethod = Callable[
-		[Union[_TD, None], User, int, Bot], Awaitable[Union[RateData, _TD]],
+		[Union[_RD, None], User, int, Bot], Awaitable[Union[RateData, _RD]],
 	]
 
 	_ProcHandleMethod = Callable[

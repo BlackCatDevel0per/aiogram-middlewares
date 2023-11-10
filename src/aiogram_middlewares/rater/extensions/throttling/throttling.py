@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # FIXME: Duplicating..
 # TODO: Limiters claen by weakref..
-# FIXME: Name & docs..
+# FIXME: Name & docs with pkg arch..
 class RaterThrottleBase(RaterABC):
 
 	def __init__(
@@ -36,8 +36,11 @@ class RaterThrottleBase(RaterABC):
 		self.sem_period: PositiveInt | PositiveFloat
 
 		if sem_period is None:
-			self.sem_period = self.period_sec - (self.period_sec / 100)  # FIXME: %%
-			logger.warning('Throttle period is not set! In use: %f', self.sem_period)  # TODO: More info..
+			self.sem_period = self.period_sec - (self.period_sec / 90)  # FIXME: %%
+			logger.warning(
+				'Throttle period is not set! In use: %f',
+				self.sem_period,
+			)  # TODO: More info..
 		else:
 			if sem_period >= self.period_sec:
 				msg = (
@@ -46,6 +49,19 @@ class RaterThrottleBase(RaterABC):
 				)
 				raise ValueError(msg)
 			self.sem_period = sem_period
+
+		self._sem_original = ThrottleSemaphore(
+			max_rate=self.after_handle_count,
+			time_period=self.sem_period,
+		)
+
+
+	def _get_sem_ins(self: RaterThrottleBase) -> ThrottleSemaphore:
+		"""Return copy of the throttle semaphore created on class init.
+
+		It's a bit faster than creating a new instance of the semaphore with the same params.
+		"""
+		return self._sem_original.copy()
 
 
 	async def _trigger(
@@ -56,7 +72,7 @@ class RaterThrottleBase(RaterABC):
 		# Runs at first trigger to create entity, else returns data (counters)
 		if not rate_data:
 			logger.debug(
-				'[%s] Handle user (begin): %s',
+				'[%s] Trigger user (begin): %s',
 				self.__class__.__name__, event_user.username,
 			)
 
@@ -67,10 +83,7 @@ class RaterThrottleBase(RaterABC):
 			# TODO: Clean cache on exceptions.. (to avoid mutes..)
 			self._cache.set(
 				event_user.id, rate_data,
-				obj=ThrottleSemaphore(
-					max_rate=self.after_handle_count,
-					time_period=self.sem_period,
-				),
+				obj=self._get_sem_ins(),
 				ttl=ttl,
 			)
 		assert rate_data is not None  # plug for linter

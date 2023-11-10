@@ -23,7 +23,7 @@ def make_dataclass(*args: Any, **kwargs: Any):  # noqa: F811,ANN201
 	pyv = (sys.version_info.major, sys.version_info.minor)
 	# TODO: More features..
 	defs = {
-		'slots': (True, (3, 10)),
+		# 'slots': (True, (3, 10)),  # Glitches.. [ AttributeError: 'member_descriptor' object has no attribute 'locked' ]
 		'kw_only': (True, (3, 10)),
 	}
 	for arg, vp in defs.items():

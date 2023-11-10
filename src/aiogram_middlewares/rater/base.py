@@ -95,15 +95,16 @@ class RaterBase(RaterABC):
 	) -> None:
 		# TODO: More docstrings!!!
 		# TODO: Cache autocleaner schedule (if during work had network glitch or etc.)
-		# TODO: Mb rename topping to debouncing..
-		if period_sec <= 1:
-			msg = '`period` must be positive!'
+		# TODO: Mb rename topping to debounc(e/ing)..
+		if period_sec < 1:
+			msg = f'`period` must be positive, `{period_sec=}`'
 			raise ValueError(msg)
 
-		if after_handle_count <= 1:
-			msg = '`after_handle_count` must be positive!'
+		if after_handle_count < 1:
+			msg = f'`after_handle_count` must be positive, `{after_handle_count=}`'
 			raise ValueError(msg)
 
+		##
 		if period_sec < 3:  # noqa: PLR2004
 			# recommended to set above 3 for period..
 			logger.warning('Recommended to set above 3 for `period_sec` param..')

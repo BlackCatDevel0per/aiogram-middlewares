@@ -18,7 +18,7 @@ logging.getLogger('aiogram_middlewares').setLevel(logging.DEBUG)
 # FIXME: Annotations..
 middleware = RateMiddleware(
 	throttling_mode=True,
-	sem_period=7,
+	sem_period=4,
 	topping_up=False,
 
 	period_sec=8, after_handle_count=2,

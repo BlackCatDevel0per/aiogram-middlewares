@@ -1,1 +1,1 @@
-from .lazy_ttl import LazyMemoryCache, LazyMemoryCacheSerializable  # noqa: F401
+from .lazy_ttl import CacheItem, LazyMemoryCache, LazyMemoryCacheSerializable  # noqa: F401

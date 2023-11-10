@@ -28,7 +28,7 @@ dp.update.outer_middleware(
 		sem_period=4,
 		topping_up=False,
 
-		period_sec=5, after_handle_count=1,
+		period_sec=5, after_handle_count=3,
 		# topping_up=False,  # it breaks through a bit -_-
 		# cooldown_message=None,
 		# calmed_message=None,

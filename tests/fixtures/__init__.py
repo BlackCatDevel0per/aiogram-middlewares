@@ -1,1 +1,1 @@
-from .fixtures import data, empty_handler, message
+from .fixtures import data, data2, empty_handler, message, message2  # noqa: F401

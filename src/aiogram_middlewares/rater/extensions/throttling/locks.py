@@ -92,12 +92,69 @@ class ThrottleSemaphore(Semaphore):
 			# TODO: Add delete callback
 			# TODO: Refactor..
 			self._leak_task = self._loop.create_task(self._leak_sem())
-		self.acquire = super().acquire  # type: ignore
+		self.acquire = self._acquire  # type: ignore
 		return await self.acquire()
 
 
+	def locked(self: ThrottleSemaphore) -> bool:
+		"""Return True if semaphore cannot be acquired immediately."""
+		return self._value == 0 or (
+			any(not w.cancelled() for w in self._waiters))
+
+
+	async def _acquire(self: ThrottleSemaphore) -> Literal[True]:
+		"""Acquire a semaphore.
+
+		If the internal counter is larger than zero on entry,
+		decrement it by one and return True immediately.  If it is
+		zero on entry, block, waiting until some other coroutine has
+		called release() to make it larger than 0, and then return
+		True.
+		"""
+		if not self.locked():
+			self._value -= 1
+			return True
+
+		fut = self._loop.create_future()
+		self._waiters.append(fut)
+
+		# Finally block should be called before the CancelledError
+		# handling as we don't want CancelledError to call
+		# _wake_up_first() and attempt to wake up itself.
+		try:
+			try:
+				await fut
+			finally:
+				self._waiters.remove(fut)
+		except asyncio.CancelledError:
+			if not fut.cancelled():
+				self._value += 1
+				self._wake_up_next()
+			raise
+
+		if self._value > 0:
+			self._wake_up_next()
+		return True
+
+
+	def _wake_up_next(self: ThrottleSemaphore) -> None:
+		"""Wake up the first waiter that isn't done."""
+		if not self._waiters:
+			return
+
+		for fut in self._waiters:
+			if not fut.done():
+				self._value -= 1
+				fut.set_result(True)  # noqa: FBT003
+				return
+
+
 	def __del__(self: ThrottleSemaphore) -> None:
-		logger.debug('Semaphore object deleted at %s', hex(id(self)))
+		logger.debug(
+			'<Semaphore> object [bold red blink]deleted[/] at %s',
+			hex(id(self)),
+			extra={'markup': True},
+		)
 
 
 	def copy(self: ThrottleSemaphore) -> ThrottleSemaphore:
@@ -114,14 +171,22 @@ class ThrottleSemaphore(Semaphore):
 	async def _leak_sem(self: ThrottleSemaphore) -> None:
 		"""Background task that leaks semaphore releases by rate of tasks per time_period."""
 		# Can be implemented using `call_later` with queue (but more calculations..)
-		logger.debug('Semaphore task start at %s', hex(id(self)))  # TODO: Aliases..
+		logger.debug(
+			'<Semaphore> task [bold green blink]start[/] at %s',
+			hex(id(self)),
+			extra={'markup': True},
+		)  # TODO: Aliases.. (& colors based on it)
 		while obj_getrefcount(self) > self._leak_task_min_refs2die:  # FIXME: Crutchy~~
 			await asyncio.sleep(self._delay_time)
 			if self._value < self._max_rate:
 				# Increase rate value
 				self.release()
 
-		logger.debug('Semaphore task done at %s', hex(id(self)))
+		logger.debug(
+			'<Semaphore> task [bold yellow blink]done[/] at %s',
+			hex(id(self)),
+			extra={'markup': True},
+		)
 
 
 	async def __aexit__(

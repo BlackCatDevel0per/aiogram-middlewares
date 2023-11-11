@@ -5,18 +5,15 @@ import logging
 
 from aiogram_middlewares import RateMiddleware
 from rich.logging import RichHandler
-from rich.traceback import install as rich_traceback_install
 
 # TODO: More fixtures (msg, query, inline and etc. formats & etc) & bug fixes..
 from tests.fixtures import data, data2, empty_handler, message, message2
-
-rich_traceback_install()
 
 logging.basicConfig(
 	format='%(message)s',
 	level=logging.INFO,
 
-	handlers=[RichHandler()],
+	handlers=[RichHandler(rich_tracebacks=True)],
 )
 logging.getLogger('aiogram_middlewares').setLevel(logging.DEBUG)
 

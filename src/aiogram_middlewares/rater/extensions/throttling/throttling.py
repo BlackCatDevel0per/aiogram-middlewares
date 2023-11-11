@@ -68,8 +68,7 @@ class RaterThrottleBase(RaterABC):
 		self: RaterThrottleBase, rate_data: _RD | None,
 		event_user: User, ttl: int, bot: Bot,  # noqa: ARG002
 	) -> RateData | _RD:
-		"""Antiflood.."""
-		# Runs at first trigger to create entity, else returns data (counters)
+		"""Run at first trigger to create entity, else returns data (usually counters)."""
 		if not rate_data and not self._cache.has_key(event_user.id):
 			logger.debug(
 				'[%s] Trigger user (begin): %s',

@@ -69,22 +69,26 @@ class RaterThrottleBase(RaterABC):
 		event_user: User, ttl: int, bot: Bot,  # noqa: ARG002
 	) -> RateData | _RD:
 		"""Run at first trigger to create entity, else returns data (usually counters)."""
-		if not rate_data and not self._cache.has_key(event_user.id):
-			logger.debug(
-				'[%s] Trigger user (begin): %s',
-				self.__class__.__name__, event_user.username,
-			)
+		if rate_data or self._cache.has_key(event_user.id):
+			assert rate_data is not None  # plug for linter
+			return rate_data
 
-			rate_data = RateData()
-			# Add new item to cache with ttl from initializator.
-			# (`Cache.add` does the same, but with checking in cache..)
-			# TODO: Mb make custom variant for that..
-			# TODO: Clean cache on exceptions.. (to avoid mutes..)
-			self._cache.set(
-				event_user.id, rate_data,
-				obj=self._get_sem_ins(),
-				ttl=ttl,
-			)
+		logger.debug(
+			'[%s] Trigger user (begin): %s',
+			self.__class__.__name__, event_user.username,
+		)
+
+		rate_data = RateData()
+		# Add new item to cache with ttl from initializator.
+		# (`Cache.add` does the same, but with checking in cache..)
+		# TODO: Mb make custom variant for that..
+		# TODO: Clean cache on exceptions.. (to avoid mutes..)
+		self._cache.set(
+			event_user.id, rate_data,
+			obj=self._get_sem_ins(),
+			ttl=ttl,
+		)
+
 		assert rate_data is not None  # plug for linter
 		return rate_data
 

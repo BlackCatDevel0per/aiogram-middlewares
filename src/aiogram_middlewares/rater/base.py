@@ -205,27 +205,31 @@ class RaterBase(RaterABC):
 		return await self._trigger(rate_data, event_user, ttl, bot)
 
 
+	# TODO: Move to another object to avoid duplicating..
 	async def _trigger(
 		self: RaterBase, rate_data: _RD | None,
 		event_user: User, ttl: int, bot: Bot,  # noqa: ARG002
 	) -> RateData | _RD:
-		"""Antiflood.."""
-		# Runs at first trigger to create entity, else returns data (counters)
-		if not rate_data:
-			logger.debug(
-				'[%s] Handle user (begin): %s',
-				self.__class__.__name__, event_user.username,
-			)
+		"""Run at first trigger to create entity, else returns data (usually counters)."""
+		if rate_data or self._cache.has_key(event_user.id):
+			assert rate_data is not None  # plug for linter
+			return rate_data
 
-			rate_data = RateData()
-			# Add new item to cache with ttl from initializator.
-			# (`Cache.add` does the same, but with checking in cache..)
-			# TODO: Mb make custom variant for that..
-			# TODO: Clean cache on exceptions.. (to avoid mutes..)
-			self._cache.set(
-				event_user.id, rate_data,
-				ttl=ttl,
-			)
+		logger.debug(
+			'[%s] Trigger user (begin): %s',
+			self.__class__.__name__, event_user.username,
+		)
+
+		rate_data = RateData()
+		# Add new item to cache with ttl from initializator.
+		# (`Cache.add` does the same, but with checking in cache..)
+		# TODO: Mb make custom variant for that..
+		# TODO: Clean cache on exceptions.. (to avoid mutes..)
+		self._cache.set(
+			event_user.id, rate_data,
+			ttl=ttl,
+		)
+
 		assert rate_data is not None  # plug for linter
 		return rate_data
 
@@ -241,7 +245,7 @@ class RaterBase(RaterABC):
 		# TODO: Mb log handle's name..
 		logger.debug(
 			'[%s] Handle user (proc): %s',
-			self.__class__.__name__, event_user.username,
+			self.__class__.__name__, event_user.username,  # FIXME: Log this stuff by hash..
 		)
 		return await handle(event, data)
 

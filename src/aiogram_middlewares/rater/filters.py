@@ -50,7 +50,7 @@ class RateLimiter(RaterAttrsABC, Filter):
 		# TODO: Mb log handle's name..
 		logger.debug(
 			'[%s] Handle user (proc): %s',
-			self.__class__.__name__, event_user.username,
+			self.__class__.__name__, event_user.username,  # FIXME: Log this stuff by hash..
 		)
 		return True
 

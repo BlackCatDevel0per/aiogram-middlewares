@@ -8,10 +8,16 @@ from aiogram.filters import Command
 from aiogram_middlewares import RateLimiter, RateMiddleware
 from aiogram_middlewares.utils import BrotliedPickleSerializer
 from dotenv import dotenv_values
+from rich.logging import RichHandler
+from rich.traceback import install as rich_traceback_install
+
+rich_traceback_install()
 
 logging.basicConfig(
-	format='%(filename)s [LINE:%(lineno)d] #%(levelname)-8s [%(asctime)s]  %(message)s',
+	format='%(message)s',
 	level=logging.INFO,
+
+	handlers=[RichHandler()],
 )
 logging.getLogger('aiogram_middlewares').setLevel(logging.DEBUG)
 

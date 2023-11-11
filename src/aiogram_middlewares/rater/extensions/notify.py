@@ -156,8 +156,9 @@ class RateNotifyCalmed(RateMiddleABC):
 		rate_data: RateData, event: Update, event_user: User, data: HandleData,  # noqa: ARG002
 		bot: Bot,
 	) -> None:
-		"""Call: On item in cache die - send message to user."""
-		self._cache.set_handle_subcallback(
+		"""Call: On item in cache die - send message to user or log on error."""
+		# TODO: Make try/raise optionally..
+		self._cache.try_set_handle_subcallback(
 			event_user.id,
 			# plug awaitable
 			lambda: bot.send_message(chat_id=event_user.id, text=self.calmed_message),

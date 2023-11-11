@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# TODO: ABC..
+# TODO: ABC.. & more variations)
 class ThrottleSemaphore(Semaphore):
 
 	__slots__ = (
@@ -108,7 +108,7 @@ class ThrottleSemaphore(Semaphore):
 		return ins
 
 
-	# TODO: Done callback (task_cancel&cleanup+4notify-user_optional)
+	# TODO: Done callback (task_cancel&cleanup+4notify-user_optional) - callbacks (condition(s)) variants =)
 
 
 	async def _leak_sem(self: ThrottleSemaphore) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import suppress as exception_suppress
 from time import perf_counter
 from typing import TYPE_CHECKING
@@ -10,7 +11,7 @@ from aiogram_middlewares.utils import BrotliedPickleSerializer, make_dataclass
 if TYPE_CHECKING:
 	from asyncio import AbstractEventLoop, Task, TimerHandle
 	from dataclasses import dataclass as make_dataclass
-	from typing import Any, Callable
+	from typing import Any, Callable, Literal
 
 	from aiogram_middlewares.utils import BaseSerializer
 
@@ -21,6 +22,14 @@ if TYPE_CHECKING:
 	)
 
 	key_obj = Any
+	true = Literal[True]
+
+
+logger = logging.getLogger(__name__)
+
+
+class CacheKeyError(KeyError):
+	...
 
 
 @make_dataclass
@@ -37,6 +46,7 @@ _NO_ITEM = object()
 # TODO: Add set/update method without ttl for things like throttle?
 
 
+# TODO: Make subclass & abc for some stuff..
 class LazyMemoryCache:
 	"""Async wrapper around dict operations & event loop timers to use it as a ttl cache."""
 
@@ -65,13 +75,18 @@ class LazyMemoryCache:
 		self: LazyMemoryCache,
 		key: key_obj, value: Any, obj: object = None,
 		ttl: ttl_type = 10,
-	) -> bool:
+	) -> true:
 		# ttl must not be zero!
 		# Not cancels old item handle!
 		handle: TimerHandle = self._make_handle_delete(key, ttl)
 		item = CacheItem(value=value, handle=handle, obj=obj)
 		self._cache[key] = item
 		return True
+
+
+	def has_key(self: LazyMemoryCache, key: key_obj) -> bool:
+		"""Check if the cache has such a key."""
+		return key in self._cache
 
 
 	def get_item(self: LazyMemoryCache, key: key_obj, default: Any = None) -> Any | None:
@@ -90,14 +105,14 @@ class LazyMemoryCache:
 	def store(
 		self: LazyMemoryCache,
 		key: key_obj, value: Any,
-	) -> bool:
+	) -> true:
 		return self.set(key, value, self._ttl)
 
 
 	# TODO: Mb add obj arg.. (don't forget to pass arg into serializable variant too..)
 	def update(
 		self: LazyMemoryCache, key: key_obj, value: Any,
-	) -> bool:
+	) -> true:
 		# Doesn't cancels handler task =)
 		self._cache[key].value = value
 		return True
@@ -122,7 +137,7 @@ class LazyMemoryCache:
 		return self.update(key, value)
 
 
-	def delete(self: LazyMemoryCache, key: key_obj) -> bool:
+	def delete(self: LazyMemoryCache, key: key_obj) -> true:
 		# Not cancels handle
 		del self._cache[key]
 		return True
@@ -132,7 +147,7 @@ class LazyMemoryCache:
 		self: LazyMemoryCache,
 		key: key_obj,
 		ttl: ttl_type,
-	) -> bool:
+	) -> true:
 		"""Use if you sure item still in cache (recomment with cache cleanup scheduling)."""
 		item = self._cache[key]
 		item.handle.cancel()
@@ -142,7 +157,7 @@ class LazyMemoryCache:
 
 	async def _delete_with_subcall(
 		self: LazyMemoryCache, key: key_obj, plugged_awaitable: PluggedAwaitable,
-	) -> bool:
+	) -> true:
 		status = self.delete(key)
 		await plugged_awaitable()
 		return status
@@ -162,7 +177,11 @@ class LazyMemoryCache:
 	def cancel_handle(
 		self: LazyMemoryCache, key: key_obj,
 	) -> CacheItem:
-		item = self._cache[key]
+		try:
+			item = self._cache[key]
+		except KeyError as ke:
+			msg = f'Key `{key}` not found or removed from cache!'
+			raise CacheKeyError(msg) from ke
 		item.handle.cancel()
 		# del item.handle
 		return item
@@ -171,7 +190,7 @@ class LazyMemoryCache:
 	def replace_handle_with_subcallback(
 		self: LazyMemoryCache, key: key_obj, plugged_awaitable: PluggedAwaitable,
 		ttl: float | int,
-	) -> bool:
+	) -> true:
 		item = self.cancel_handle(key)
 
 		item.handle = self._loop.call_later(
@@ -183,7 +202,7 @@ class LazyMemoryCache:
 
 	def set_handle_subcallback(
 		self: LazyMemoryCache, key: key_obj, plugged_awaitable: PluggedAwaitable,
-	) -> bool:
+	) -> true:
 		item = self.cancel_handle(key)
 
 		# NOTE: Hmm..
@@ -195,6 +214,18 @@ class LazyMemoryCache:
 		)
 
 		return True
+
+
+	def try_set_handle_subcallback(
+		self: LazyMemoryCache, key: key_obj, plugged_awaitable: PluggedAwaitable,
+	) -> bool:
+		try:
+			return self.set_handle_subcallback(key, plugged_awaitable)
+		except CacheKeyError:
+			logger.warning("Key `%s` doesn't exists.", key)
+		except Exception:
+			logger.exception('Error on setting handle subcallback')
+		return False
 
 
 class LazyMemoryCacheSerializable(LazyMemoryCache):
@@ -213,7 +244,7 @@ class LazyMemoryCacheSerializable(LazyMemoryCache):
 		self: LazyMemoryCacheSerializable,
 		key: key_obj, value: Any, obj: object = None,
 		ttl: ttl_type = 10,
-	) -> bool:
+	) -> true:
 		# ttl must not be zero!
 		return super().set(key, self._serializer.serialize(value), obj, ttl)
 
@@ -221,7 +252,7 @@ class LazyMemoryCacheSerializable(LazyMemoryCache):
 	def update(
 		self: LazyMemoryCacheSerializable,
 		key: key_obj, value: Any,
-	) -> bool:
+	) -> true:
 		# ttl must not be zero!
 		return super().update(key, self._serializer.serialize(value))
 

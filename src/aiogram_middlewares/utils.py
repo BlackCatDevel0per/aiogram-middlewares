@@ -39,7 +39,7 @@ class BaseSerializer(ABC):
 		raise NotImplementedError
 
 	@abstractmethod
-	def deserialize(self: BaseSerializer, value: bytes) -> object:
+	def deserialize(self: BaseSerializer, value: bytes | None) -> object:
 		raise NotImplementedError
 
 
@@ -66,7 +66,7 @@ class BrotliedPickleSerializer(BaseSerializer):
 		"""Serialize the received value using ``pickle.dumps`` and compresses using brotli."""
 		return brotli_compress(pickle_dumps(value, protocol=self.pickle_protocol))
 
-	def deserialize(self: BrotliedPickleSerializer, value: bytes) -> object:
+	def deserialize(self: BrotliedPickleSerializer, value: bytes | None) -> object:
 		"""Decompresses using brotli & deserialize value using ``pickle.loads``."""
 		if value is None:
 			return None

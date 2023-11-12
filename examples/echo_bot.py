@@ -30,12 +30,13 @@ dp.update.outer_middleware(
 		throttling_mode=True,
 		sem_period=4,
 		topping_up=False,
+		calmed_message=None,
 
 		period_sec=5, after_handle_count=3,
 		# warnings_count=3,
 		# topping_up=False,
 		# cooldown_message=None,
-		calmed_message=None,
+		# calmed_message=None,
 		data_serializer=BrotliedPickleSerializer,
 	),
 )
@@ -44,12 +45,15 @@ dp.update.outer_middleware(
 @dp.message(
 	Command('help'),
 
-	# RateLimiter(
-	# 	period_sec=15, after_handle_count=2,
-	# 	# topping_up=False,
-	# 	# calmed_message=None,  # Because we don't want more messages)
-	# 	# data_serializer=BrotliedPickleSerializer,
-	# ),
+	RateLimiter(
+		throttling_mode=True,
+		sem_period=13,
+
+		period_sec=15, after_handle_count=2,
+		# topping_up=False,
+		# calmed_message=None,  # Because we don't want more messages)
+		# data_serializer=BrotliedPickleSerializer,
+	),
 )
 async def help_handler(message: types.Message) -> None:
 	await message.reply('Hi! This is echo bot for testing antiflood with throttling + debouncing =)')

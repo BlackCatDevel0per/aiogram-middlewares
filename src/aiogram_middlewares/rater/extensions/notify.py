@@ -150,6 +150,7 @@ class RateNotifyCalmed(RateMiddleABC):
 	) -> None:
 		self.calmed_message = calmed_message
 
+
 	async def on_exceed_rate(
 		self: RateNotifyCalmed,
 		handle: HandleType,  # noqa: ARG002
@@ -166,7 +167,6 @@ class RateNotifyCalmed(RateMiddleABC):
 		# ...
 
 
-# TODO: call_later this way for throttling..
 # Cooldown + Calmed
 class RateNotifyCC(RateNotifyCooldown):
 
@@ -186,8 +186,8 @@ class RateNotifyCC(RateNotifyCooldown):
 		rate_data: RateData, event: Update, event_user: User, data: HandleData,
 		bot: Bot,
 	) -> None:
-		await RateNotifyCooldown.on_exceed_rate(
-			self, handle, rate_data, event, event_user, data, bot,
+		await super().on_exceed_rate(
+			handle, rate_data, event, event_user, data, bot,
 		)
 		await RateNotifyCalmed.on_exceed_rate(
 			self, handle, rate_data, event, event_user, data, bot,

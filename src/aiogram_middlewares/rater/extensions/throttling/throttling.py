@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 	from aiogram.types import Update, User
 
 	from aiogram_middlewares.rater.base import HandleType
+	from aiogram_middlewares.rater.caches import CacheItem
 	from aiogram_middlewares.rater.types import _RD, HandleData
 
 	from .locks import PositiveFloat, PositiveInt
@@ -56,12 +57,31 @@ class RaterThrottleBase(RaterABC):
 		)
 
 
-	def _get_sem_ins(self: RaterThrottleBase) -> ThrottleSemaphore:
+	def _get_sem_ins(self: RaterThrottleBase, event_user: User) -> ThrottleSemaphore:
 		"""Return copy of the throttle semaphore created on class init.
 
 		It's a bit faster than creating a new instance of the semaphore with the same params.
 		"""
+		# pending_sem: ThrottleSemaphore | None = self._cache.get_obj(event_user.id)
+		# if pending_sem:
+		# 	return pending_sem
 		return self._sem_original.copy()
+
+
+	# TODO: Mb move into cache..
+	def reuse_semaphore_callback(self: RaterThrottleBase, key: int, item: CacheItem) -> bool:
+		sem: ThrottleSemaphore = item.obj  # type: ignore
+		if sem.is_jobs_pending():
+			logger.debug('<Cache> reusing semaphore obj %s', hex(id(self)))
+			self._cache._make_handle(
+				# TODO: Mb add property with sem remaining time..
+				self.period_sec,
+				lambda: self.reuse_semaphore_callback(key, item),
+			)
+			return True
+		logger.debug('<Cache> deleting semaphore obj %s', hex(id(self)))
+		self._cache.delete(key)
+		return False
 
 
 	async def _trigger(
@@ -83,10 +103,17 @@ class RaterThrottleBase(RaterABC):
 		# (`Cache.add` does the same, but with checking in cache..)
 		# TODO: Mb make custom variant for that..
 		# TODO: Clean cache on exceptions.. (to avoid mutes..)
+		sem = self._get_sem_ins(event_user)
 		self._cache.set(
 			event_user.id, rate_data,
-			obj=self._get_sem_ins(),
+			obj=sem,
 			ttl=ttl,
+		)
+
+		# FIXME: Reuse old undone semaphore..
+		self._cache.try_replace_handle_sync_callback(
+			event_user.id,
+			self.reuse_semaphore_callback,
 		)
 
 		assert rate_data is not None  # plug for linter

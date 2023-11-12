@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from aiogram_middlewares.rater.extensions.notify import RateMiddleABC
+from aiogram_middlewares.rater.base import RaterAttrsABC
+from aiogram_middlewares.rater.extensions.notify import RateNotifyCooldown
 
 if TYPE_CHECKING:
 	from typing import Any, Awaitable, Callable
@@ -13,6 +15,7 @@ if TYPE_CHECKING:
 	from aiogram.types import Update, User
 
 	from aiogram_middlewares.rater.base import HandleType
+	from aiogram_middlewares.rater.extensions.notify import PositiveInt  # FIXME: Move to types..
 	from aiogram_middlewares.rater.models import RateData
 	from aiogram_middlewares.rater.types import HandleData
 
@@ -22,8 +25,32 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class RateThrottleMiddleABC(RateMiddleABC):
+class RateThrottleMiddleABC(RaterAttrsABC, ABC):
 	throttle: Callable[[ThrottleSemaphore], Awaitable[None]]
+
+
+	@abstractmethod
+	async def on_exceed_rate(
+		self: RateThrottleMiddleABC,
+		handle: HandleType,
+		rate_data: RateData, sem: ThrottleSemaphore, event: Update, event_user: User,
+		data: HandleData,
+		bot: Bot,
+	) -> None:
+		raise NotImplementedError
+
+
+	@abstractmethod
+	async def _middleware(
+		self: RateThrottleMiddleABC,
+		handle: HandleType,
+		event: Update,
+		event_user: User,
+		data: HandleData,
+		bot: Bot,
+		rate_data: RateData,
+	) -> Any | None:
+		raise NotImplementedError
 
 
 class RateThrottleNotifyBase(RateThrottleMiddleABC):
@@ -33,7 +60,8 @@ class RateThrottleNotifyBase(RateThrottleMiddleABC):
 	async def on_exceed_rate(
 		self: RateThrottleNotifyBase,
 		handle: HandleType,
-		rate_data: RateData, event: Update, event_user: User, data: HandleData,
+		rate_data: RateData, sem: ThrottleSemaphore, event: Update, event_user: User,
+		data: HandleData,
 		bot: Bot,
 	) -> None:
 		raise NotImplementedError
@@ -58,11 +86,73 @@ class RateThrottleNotifyBase(RateThrottleMiddleABC):
 		# TODO: More test `calmed` notify..
 
 		if sem.locked():
-			await self.on_exceed_rate(handle, rate_data, event, event_user, data, bot)
+			await self.on_exceed_rate(handle, rate_data, sem, event, event_user, data, bot)
 
 		# TODO: On queue/task(s) end normally send calmed message..
 		await self.throttle(sem)
 		return await self.proc_handle(
 			handle, rate_data, event, event_user,
 			data,
+		)
+
+
+# Calmed
+class RateThrottleNotifyCalmed(RateThrottleMiddleABC):
+
+	def __init__(
+		self: RateThrottleNotifyCalmed,
+		calmed_message: str | None,
+	) -> None:
+		self.calmed_message = calmed_message
+
+
+	async def on_exceed_rate(
+		self: RateThrottleNotifyCalmed,
+		handle: HandleType,  # noqa: ARG002
+		rate_data: RateData, sem: ThrottleSemaphore, event: Update, event_user: User,  # noqa: ARG002
+		data: HandleData,  # noqa: ARG002
+		bot: Bot,
+	) -> None:
+		"""Call: On item in cache die - send message to user or log on error."""
+		# TODO: Make try/raise optionally..
+
+		sem.stick_leak_done_callback(
+			lambda: asyncio.create_task(
+				bot.send_message(
+					chat_id=event_user.id, text=self.calmed_message,
+				),
+			),
+		)
+
+		# ...
+
+
+# Cooldown + Calmed
+class RateThrottleNotifyCC(RateThrottleMiddleABC):
+
+	def __init__(
+		self: RateThrottleNotifyCC,
+		calmed_message: str | None, cooldown_message: str | None,
+		warnings_count: PositiveInt,
+	) -> None:
+		self.warnings_count = warnings_count
+		self.cooldown_message = cooldown_message
+		self.calmed_message = calmed_message
+
+
+	try_user_warning = RateNotifyCooldown.try_user_warning
+
+
+	async def on_exceed_rate(  # type: ignore
+		self: RateThrottleNotifyCC,
+		handle: HandleType,
+		rate_data: RateData, sem: ThrottleSemaphore, event: Update, event_user: User,
+		data: HandleData,
+		bot: Bot,
+	) -> None:
+		await RateNotifyCooldown.on_exceed_rate(
+			self, handle, rate_data, event, event_user, data, bot,
+		)
+		await RateThrottleNotifyCalmed.on_exceed_rate(
+			self, handle, rate_data, sem, event, event_user, data, bot,
 		)

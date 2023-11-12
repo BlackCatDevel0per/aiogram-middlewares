@@ -61,7 +61,7 @@ class LazyMemoryCache:
 
 
 	def _make_handle(
-		self: LazyMemoryCache, ttl: ttl_type, callback: Callable[..., Any], *args: Any,
+		self: LazyMemoryCache, ttl: ttl_type, callback: Callable[[], Any], *args: Any,
 	) -> TimerHandle:
 		"""Wrap around asyncio event loop's `call_later` method."""
 		return self._loop.call_later(ttl, callback, *args)
@@ -106,6 +106,7 @@ class LazyMemoryCache:
 		self: LazyMemoryCache,
 		key: key_obj, value: Any,
 	) -> true:
+		"""Set with default ttl."""
 		return self.set(key, value, self._ttl)
 
 
@@ -163,10 +164,24 @@ class LazyMemoryCache:
 		return status
 
 
+	def _delete_with_sync_subcall(
+		self: LazyMemoryCache, key: key_obj, callback: Callable[[], Any],
+	) -> true:
+		status = self.delete(key)
+		callback()
+		return status
+
+
 	def wrap_delete_with_subcall(
 		self: LazyMemoryCache, key: key_obj, plugged_awaitable: PluggedAwaitable,
 	) -> Callable[[], Task[bool]]:
 		return lambda: asyncio.ensure_future(self._delete_with_subcall(key, plugged_awaitable))
+
+
+	def wrap_delete_with_sync_subcall(
+		self: LazyMemoryCache, key: key_obj, callback_: PluggedAwaitable,
+	) -> Callable[[], Any]:
+		return lambda: self._delete_with_sync_subcall(key, callback_)
 
 
 	@staticmethod
@@ -206,26 +221,80 @@ class LazyMemoryCache:
 		item = self.cancel_handle(key)
 
 		# NOTE: Hmm..
+		# TODO: Unite to one func..
 		handle_remaining = self.calc_remaining_of(item.handle)
 
 		item.handle = self._make_handle(
 			handle_remaining,
 			self.wrap_delete_with_subcall(key, plugged_awaitable),
 		)
+		#
 
 		return True
 
 
-	def try_set_handle_subcallback(
-		self: LazyMemoryCache, key: key_obj, plugged_awaitable: PluggedAwaitable,
+	def set_handle_sync_subcallback(
+		self: LazyMemoryCache, key: key_obj, callback: Callable[[], Any],
+	) -> true:
+		item = self.cancel_handle(key)
+
+		# NOTE: Hmm..
+		handle_remaining = self.calc_remaining_of(item.handle)
+
+		item.handle = self._make_handle(
+			handle_remaining,
+			self.wrap_delete_with_sync_subcall(key, callback),
+		)
+
+		return True
+
+
+	def replace_handle_sync_callback(
+		self: LazyMemoryCache, key: key_obj, callback: Callable[[key_obj, CacheItem], Any],
+	) -> true:
+		item = self.cancel_handle(key)
+
+		# NOTE: Hmm..
+		handle_remaining = self.calc_remaining_of(item.handle)
+
+		item.handle = self._make_handle(
+			handle_remaining,
+			lambda: callback(key, item),
+		)
+
+		return True
+
+
+	# TODO: Use as decorator..
+	def _try_shs(
+		self: LazyMemoryCache, func: Callable[[key_obj, PluggedAwaitable], bool],
+		key: key_obj, callback: Callable,
 	) -> bool:
 		try:
-			return self.set_handle_subcallback(key, plugged_awaitable)
+			return func(key, callback)  # cls method
 		except CacheKeyError:
 			logger.warning("Key `%s` doesn't exists.", key)
 		except Exception:
 			logger.exception('Error on setting handle subcallback')
 		return False
+
+
+	def try_set_handle_subcallback(
+		self: LazyMemoryCache, key: key_obj, plugged_awaitable: PluggedAwaitable,
+	) -> bool:
+		return self._try_shs(self.set_handle_subcallback, key, plugged_awaitable)
+
+
+	def try_set_handle_sync_subcallback(
+		self: LazyMemoryCache, key: key_obj, callback: Callable[[], Any],
+	) -> bool:
+		return self._try_shs(self.set_handle_sync_subcallback, key, callback)
+
+
+	def try_replace_handle_sync_callback(
+		self: LazyMemoryCache, key: key_obj, callback: Callable[[key_obj, CacheItem], Any],
+	) -> bool:
+		return self._try_shs(self.replace_handle_sync_callback, key, callback)
 
 
 class LazyMemoryCacheSerializable(LazyMemoryCache):

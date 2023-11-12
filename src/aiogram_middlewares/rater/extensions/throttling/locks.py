@@ -4,13 +4,12 @@ import asyncio
 import logging
 from asyncio import Semaphore
 from collections import deque
-from sys import getrefcount as obj_getrefcount
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
 	from asyncio import AbstractEventLoop, Future, Task
 	from types import TracebackType
-	from typing import Any, Literal
+	from typing import Any, Callable, Literal
 
 	from annotated_types import Gt
 	from typing_extensions import Annotated
@@ -18,11 +17,15 @@ if TYPE_CHECKING:
 	PositiveFloat = Annotated[float, Gt(0)]
 	PositiveInt = Annotated[int, Gt(0)]
 
+	true = Literal[True]
+
+	LeakDoneCallback = Callable[[], Any]
+
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: ABC.. & more variations)
+# TODO: ABC.. & more variations), remove supcls.
 class ThrottleSemaphore(Semaphore):
 
 	__slots__ = (
@@ -80,18 +83,21 @@ class ThrottleSemaphore(Semaphore):
 		self._waiters = deque()
 
 		self._loop = loop
-		self._leak_task: Task | None = None
+		self.leak_task: Task | None = None
+		self._is_leak = True
 		self._leak_task_min_refs2die: int = 3
+
+		self._leak_done_callback: LeakDoneCallback | None = None
 
 		self.acquire = self._first_acquire  # type: ignore  # Crutchy~, but ok
 
 
-	async def _first_acquire(self: ThrottleSemaphore) -> Literal[True]:
+	async def _first_acquire(self: ThrottleSemaphore) -> true:
 		"""Just check for the first time & switch to acquire."""
-		if not self._leak_task:
+		if not self.leak_task:
 			# TODO: Add delete callback
 			# TODO: Refactor..
-			self._leak_task = self._loop.create_task(self._leak_sem())
+			self.leak_task = self._loop.create_task(self._leak_sem_task())
 		self.acquire = self._acquire  # type: ignore
 		return await self.acquire()
 
@@ -102,7 +108,7 @@ class ThrottleSemaphore(Semaphore):
 			any(not w.cancelled() for w in self._waiters))
 
 
-	async def _acquire(self: ThrottleSemaphore) -> Literal[True]:
+	async def _acquire(self: ThrottleSemaphore) -> true:
 		"""Acquire a semaphore.
 
 		If the internal counter is larger than zero on entry,
@@ -149,7 +155,21 @@ class ThrottleSemaphore(Semaphore):
 				return
 
 
+	def on_leak_done_callback(self: ThrottleSemaphore, func: LeakDoneCallback) -> true:
+		"""Set callback which run on leak task done."""
+		self._leak_done_callback = func
+		return True
+
+
+	def stick_leak_done_callback(self: ThrottleSemaphore, func: LeakDoneCallback) -> bool:
+		"""Add callback which run on leak task done - if it's no callback, otherwise do nothing."""
+		if self._leak_done_callback:
+			return False
+		return self.on_leak_done_callback(func)
+
+
 	def __del__(self: ThrottleSemaphore) -> None:
+		"""Log on object delete."""
 		logger.debug(
 			'<Semaphore> object [bold red blink]deleted[/] at %s',
 			hex(id(self)),
@@ -168,19 +188,49 @@ class ThrottleSemaphore(Semaphore):
 	# TODO: Done callback (task_cancel&cleanup+4notify-user_optional) - callbacks (condition(s)) variants =)
 
 
-	async def _leak_sem(self: ThrottleSemaphore) -> None:
+	@property
+	def is_leak_done(self: ThrottleSemaphore) -> bool:
+		"""Check is leak done or not."""
+		return self._is_leak
+
+
+	def is_jobs_pending(self: ThrottleSemaphore) -> bool:
+		# ...
+		return bool(self._waiters)
+
+
+	def set_leak_done(self: ThrottleSemaphore) -> None:
+		"""Set done status for leak task."""
+		self._is_leak = False
+
+
+	async def _leak(self: ThrottleSemaphore) -> None:
+		await asyncio.sleep(self._delay_time)
+		if self._value < self._max_rate:
+			# Increase rate value
+			self.release()
+
+
+	async def _leak_sem_task(self: ThrottleSemaphore) -> None:
 		"""Background task that leaks semaphore releases by rate of tasks per time_period."""
-		# Can be implemented using `call_later` with queue (but more calculations..)
+		# Can be implemented using `call_later` with queue
+		# without step-part timing (but more calculations..)
 		logger.debug(
 			'<Semaphore> task [bold green blink]start[/] at %s',
 			hex(id(self)),
 			extra={'markup': True},
 		)  # TODO: Aliases.. (& colors based on it)
-		while obj_getrefcount(self) > self._leak_task_min_refs2die:  # FIXME: Crutchy~~
-			await asyncio.sleep(self._delay_time)
-			if self._value < self._max_rate:
-				# Increase rate value
-				self.release()
+
+		while self._is_leak:
+			await self._leak()
+
+		# If on task end has undone waiters - finish them
+		# TODO: Do it optional & choose another condition..
+		while self._waiters:
+			await self._leak()
+		# ...
+		if self._leak_done_callback:
+			self._leak_done_callback()
 
 		logger.debug(
 			'<Semaphore> task [bold yellow blink]done[/] at %s',
@@ -195,5 +245,6 @@ class ThrottleSemaphore(Semaphore):
 		exc: BaseException | None,
 		tb: TracebackType | None,
 	) -> None:
-		"""Do nothing.."""
+		"""Cancel leak task on exit."""
 		# override parent magic method (no release)
+		self.set_leak_done()  # TODO: Make it optional & tests..

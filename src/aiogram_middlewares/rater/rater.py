@@ -14,6 +14,8 @@ from .extensions import (
 	RaterThrottleBase,
 	RateSerializable,
 	RateThrottleNotifyBase,
+	RateThrottleNotifyCalmed,
+	RateThrottleNotifyCC,
 )
 
 if TYPE_CHECKING:
@@ -73,6 +75,23 @@ class AssembleInit:
 				self,
 				sem_period=sem_period,
 			)
+
+			if RateThrottleNotifyCC in mro:
+				RateThrottleNotifyCC.__init__(
+					self,
+					cooldown_message=cooldown_message,
+					calmed_message=calmed_message,
+					warnings_count=warnings_count,
+				)
+			elif RateThrottleNotifyCalmed in mro:
+				RateThrottleNotifyCalmed.__init__(
+					self,
+					calmed_message=calmed_message,
+				)
+				logger.debug(
+					'Throttle cooldown notify disabled for `%s` at `%s`',
+					self.__class__.__name__, hex(id(self.__class__.__name__)),
+				)
 
 		if RateNotifyCC in mro:
 			RateNotifyCC.__init__(
@@ -147,7 +166,10 @@ class RaterAssembler:
 		if kwargs.get('cooldown_message', _NO_SET) is not None and \
 			kwargs.get('calmed_message', _NO_SET) is not None:
 			# TODO: Make func/meta for this stuff..
-			rncc = make_class_on(bases=(RateNotifyCC, rnb))
+			rncc = make_class_on(bases=(
+					RateNotifyCC if not throttling_mode else RateThrottleNotifyCC, rnb,
+				),
+			)
 			log__is_throttle_notify()
 			bases.append(rncc)
 		##
@@ -156,7 +178,10 @@ class RaterAssembler:
 			log__is_throttle_notify()
 			bases.append(rnc)
 		elif kwargs.get('calmed_message', _NO_SET) is not None:
-			rncd = make_class_on(bases=(RateNotifyCalmed, rnb))
+			rncd = make_class_on(bases=(
+					RateNotifyCalmed if not throttling_mode else RateThrottleNotifyCC, rnb,
+				),
+			)
 			log__is_throttle_notify()
 			bases.append(rncd)
 

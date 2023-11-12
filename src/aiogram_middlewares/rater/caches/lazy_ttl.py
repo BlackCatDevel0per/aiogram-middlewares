@@ -37,6 +37,8 @@ class CacheItem:
 	"""Dataclass for timer with value data."""
 
 	handle: TimerHandle  # Timer for ttl & some actions..
+	callback: Callable  # Because TimerHandler._callback is None..
+	callback_args: tuple[...] | None = None
 	value: Any = None  # Serializable data
 	obj: object = None  # Not serializable field
 
@@ -61,14 +63,30 @@ class LazyMemoryCache:
 
 
 	def _make_handle(
-		self: LazyMemoryCache, ttl: ttl_type, callback: Callable[[], Any], *args: Any,
+		self: LazyMemoryCache, ttl: ttl_type,
+		callback: Callable, *args: Any,
 	) -> TimerHandle:
 		"""Wrap around asyncio event loop's `call_later` method."""
 		return self._loop.call_later(ttl, callback, *args)
 
 
-	def _make_handle_delete(self: LazyMemoryCache, key: key_obj, ttl: ttl_type) -> TimerHandle:
-		return self._make_handle(ttl, self.delete, key)
+	def _make_handle_delete(
+		self: LazyMemoryCache, key: key_obj, ttl: ttl_type,
+	) -> tuple[
+		TimerHandle,
+		tuple[Callable[[key_obj], true], tuple[key_obj]],
+	]:
+		return self._make_handle(ttl, self.delete, key), (self.delete, (key,))
+
+
+	# TODO: Move into dataclass..?
+	def _set_item_callback(
+		self: LazyMemoryCache,
+		item: CacheItem,
+		callback: Callable, args: tuple[...] | None,
+	) -> None:
+		item.callback = callback
+		item.callback_args = args
 
 
 	def set(
@@ -78,8 +96,13 @@ class LazyMemoryCache:
 	) -> true:
 		# ttl must not be zero!
 		# Not cancels old item handle!
-		handle: TimerHandle = self._make_handle_delete(key, ttl)
-		item = CacheItem(value=value, handle=handle, obj=obj)
+		handle, _callback = self._make_handle_delete(key, ttl)
+		# WARNNING: Sometimes `handle_calllback` is None!
+		item = CacheItem(
+			value=value, handle=handle,
+			callback=_callback[0], callback_args=_callback[1],
+			obj=obj,
+		)
 		self._cache[key] = item
 		return True
 
@@ -150,9 +173,10 @@ class LazyMemoryCache:
 		ttl: ttl_type,
 	) -> true:
 		"""Use if you sure item still in cache (recomment with cache cleanup scheduling)."""
-		item = self._cache[key]
+		item: CacheItem = self._cache[key]
 		item.handle.cancel()
-		item.handle = self._make_handle_delete(key, ttl)
+		# Reuse old callback
+		item.handle = self._make_handle(ttl, item.callback, *item.callback_args or ())
 		return True
 
 
@@ -179,7 +203,7 @@ class LazyMemoryCache:
 
 
 	def wrap_delete_with_sync_subcall(
-		self: LazyMemoryCache, key: key_obj, callback_: PluggedAwaitable,
+		self: LazyMemoryCache, key: key_obj, callback_: Callable[[], Any],
 	) -> Callable[[], Any]:
 		return lambda: self._delete_with_sync_subcall(key, callback_)
 
@@ -224,10 +248,13 @@ class LazyMemoryCache:
 		# TODO: Unite to one func..
 		handle_remaining = self.calc_remaining_of(item.handle)
 
+		cb = self.wrap_delete_with_subcall(key, plugged_awaitable)
+
 		item.handle = self._make_handle(
 			handle_remaining,
-			self.wrap_delete_with_subcall(key, plugged_awaitable),
+			cb,
 		)
+		self._set_item_callback(item, cb, None)
 		#
 
 		return True
@@ -241,14 +268,19 @@ class LazyMemoryCache:
 		# NOTE: Hmm..
 		handle_remaining = self.calc_remaining_of(item.handle)
 
+		cb = self.wrap_delete_with_sync_subcall(key, callback)
+
 		item.handle = self._make_handle(
 			handle_remaining,
-			self.wrap_delete_with_sync_subcall(key, callback),
+			cb,
 		)
+		self._set_item_callback(item, cb, None)
 
 		return True
 
 
+	# TODO: Set what it wraps.. (to avoid things like `method.<locals>.<lambda>`)
+	# TODO: Docstrings & mb rename this method..?
 	def replace_handle_sync_callback(
 		self: LazyMemoryCache, key: key_obj, callback: Callable[[key_obj, CacheItem], Any],
 	) -> true:
@@ -257,10 +289,16 @@ class LazyMemoryCache:
 		# NOTE: Hmm..
 		handle_remaining = self.calc_remaining_of(item.handle)
 
+		# TODO: Mb some optional args2callback..
+		cb = lambda: callback(key, item)  # noqa: E731
+
+		# TODO: Add func to make handle &
+		# TODO: set/update (if the same cb+cb_args) CacheItem's callback+callback_args data
 		item.handle = self._make_handle(
 			handle_remaining,
-			lambda: callback(key, item),
+			cb,
 		)
+		self._set_item_callback(item, cb, None)
 
 		return True
 

@@ -73,8 +73,9 @@ class RaterThrottleBase(RaterABC):
 		sem: ThrottleSemaphore = item.obj  # type: ignore
 		if sem.is_jobs_pending():
 			logger.debug('<Cache> reusing semaphore obj %s', hex(id(self)))
+			# Check semaphore later
 			self._cache._make_handle(
-				# TODO: Mb add property with sem remaining time..
+				# TODO: Mb add sem obj property with remaining time/,rate/,value..
 				self.period_sec,
 				lambda: self.reuse_semaphore_callback(key, item),
 			)
@@ -100,10 +101,10 @@ class RaterThrottleBase(RaterABC):
 		)
 
 		rate_data = RateData()
-		# Add new item to cache with ttl from initializator.
-		# (`Cache.add` does the same, but with checking in cache..)
 		# TODO: Mb make custom variant for that..
 		# TODO: Clean cache on exceptions.. (to avoid mutes..)
+		# Add new item to cache with ttl from initializator.
+		# (`Cache.add` does the same, but with checking in cache..)
 		sem = self._get_sem_ins(event_user)
 		self._cache.set(
 			event_user.id, rate_data,
@@ -111,7 +112,6 @@ class RaterThrottleBase(RaterABC):
 			ttl=ttl,
 		)
 
-		# FIXME: Reuse old undone semaphore..
 		self._cache.try_replace_handle_sync_callback(
 			event_user.id,
 			self.reuse_semaphore_callback,

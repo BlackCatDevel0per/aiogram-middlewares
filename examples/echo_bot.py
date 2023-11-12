@@ -29,7 +29,7 @@ dp.update.outer_middleware(
 	RateMiddleware(
 		throttling_mode=True,
 		sem_period=4,
-		topping_up=False,
+		# topping_up=False,
 
 		period_sec=5, after_handle_count=3,
 		# topping_up=False,

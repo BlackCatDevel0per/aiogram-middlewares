@@ -39,6 +39,7 @@ class CacheItem:
 	handle: TimerHandle  # Timer for ttl & some actions..
 	callback: Callable  # Because TimerHandler._callback is None..
 	callback_args: tuple[...] | None = None
+
 	value: Any = None  # Serializable data
 	obj: object = None  # Not serializable field
 

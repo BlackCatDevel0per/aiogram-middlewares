@@ -132,6 +132,7 @@ optional = true
 pytest = "^7.4.2"
 pytest-dependency = "^0.5.1"
 ruff = "^0.0.292"
+ipython = "^8.17.2"
 
 
 

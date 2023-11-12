@@ -79,7 +79,8 @@ class RaterThrottleBase(RaterABC):
 				lambda: self.reuse_semaphore_callback(key, item),
 			)
 			return True
-		logger.debug('<Cache> deleting semaphore obj %s', hex(id(self)))
+		logger.debug('<Cache> deleting old semaphore obj %s', hex(id(self)))
+		sem.set_leak_done()
 		self._cache.delete(key)
 		return False
 

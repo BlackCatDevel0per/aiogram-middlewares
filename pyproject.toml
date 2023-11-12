@@ -116,19 +116,27 @@ indent-style = "tab"
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
-brotli = {version = "^1.1.0", optional = true}
 aiogram = "^3.1.1"
+
+[tool.poetry.group.extra]
+optional = true
+
+[tool.poetry.group.extra.dependencies]
+brotli = "^1.1.0"
 rich = "^13.6.0"
 
-[tool.poetry.extras]
-optional = ['brotli']
+[tool.poetry.group.dev]
+optional = true
 
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.0.292"
-pytest-dependency = "^0.5.1"
 pytest = "^7.4.2"
+pytest-dependency = "^0.5.1"
+ruff = "^0.0.292"
 
 
+
+[tool.poetry.group.testing]
+optional = true
 
 [tool.poetry.group.testing.dependencies]
 python-dotenv = "^1.0.0"

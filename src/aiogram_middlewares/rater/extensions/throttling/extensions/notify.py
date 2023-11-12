@@ -53,6 +53,9 @@ class RateThrottleMiddleABC(RaterAttrsABC, ABC):
 		raise NotImplementedError
 
 
+# FIXME: Fix calm message send rate (so visible on high load or bad connection with server).. lol..
+
+
 class RateThrottleNotifyBase(RateThrottleMiddleABC):
 
 

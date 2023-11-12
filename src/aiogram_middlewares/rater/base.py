@@ -221,10 +221,10 @@ class RaterBase(RaterABC):
 		)
 
 		rate_data = RateData()
-		# Add new item to cache with ttl from initializator.
-		# (`Cache.add` does the same, but with checking in cache..)
 		# TODO: Mb make custom variant for that..
 		# TODO: Clean cache on exceptions.. (to avoid mutes..)
+		# Add new item to cache with ttl from initializator.
+		# (`Cache.add` does the same, but with checking in cache..)
 		self._cache.set(
 			event_user.id, rate_data,
 			ttl=ttl,

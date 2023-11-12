@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# TODO: Rearch & make it by decorator on base rater lvls..
 class RateSerializable(RaterAttrsABC):
 
 

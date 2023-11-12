@@ -14,6 +14,7 @@ from .extensions import (
 	RaterThrottleBase,
 	RateSerializable,
 	RateThrottleNotifyBase,
+	RateThrottleNotifyBaseSerializable,
 	RateThrottleNotifyCalmed,
 	RateThrottleNotifyCC,
 	RateThrottleNotifyCooldown,
@@ -168,15 +169,17 @@ class RaterAssembler:
 		if not throttling_mode:
 			kwargs.pop('sem_period', None)
 		rnb = RateNotifyBase if not throttling_mode else RateThrottleNotifyBase
+		if throttling_mode and kwargs.get('data_serializer', _NO_SET) is not _NO_SET:
+			rnb = RateThrottleNotifyBaseSerializable
 		log__onis_throttle_notify = lambda: logger.debug(  # noqa: E731
 			'Throttling mode enabled, notifications will based on `%s`',
-			RateThrottleNotifyBase.__name__,
+			rnb.__name__,  ##
 		) if throttling_mode else ...
 
 		# FIXME: Use repr..
 		logger.debug('Assembling <%s> Passed non-default args: %s', bound.__name__, str(kwargs))
 
-		if kwargs.get('data_serializer', _NO_SET) is not _NO_SET:
+		if kwargs.get('data_serializer', _NO_SET) is not _NO_SET and not throttling_mode:
 			bases.append(RateSerializable)
 
 		# FIXME: Recheck! & queuing..

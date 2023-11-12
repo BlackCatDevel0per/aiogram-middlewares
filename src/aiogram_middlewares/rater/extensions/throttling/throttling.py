@@ -144,6 +144,7 @@ class RaterThrottleBase(RaterABC):
 		assert sem is not None  # plug for linter
 
 		# FIXME: Fix serializer by serialize data before throttle (& mb for main antiflood too..)
+		# TODO: Make/use debouncing as decorator..
 		await self.throttle(sem)
 		# count up rate & proc
 		return await self.proc_handle(

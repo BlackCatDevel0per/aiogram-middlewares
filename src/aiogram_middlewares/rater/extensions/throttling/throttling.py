@@ -74,7 +74,7 @@ class RaterThrottleBase(RaterABC):
 	def reuse_semaphore_callback(self: RaterThrottleBase, key: int, item: CacheItem) -> bool:
 		sem: ThrottleSemaphore = item.obj  # type: ignore
 		if sem.is_jobs_pending():
-			logger.debug('<Cache> reusing semaphore obj %s', hex(id(self)))
+			logger.debug('<Throttle> reusing semaphore obj %s', hex(id(self)))
 			# Check semaphore later
 			self._cache._make_handle(
 				# TODO: Mb add sem obj property with remaining time/,rate/,value..
@@ -82,7 +82,7 @@ class RaterThrottleBase(RaterABC):
 				lambda: self.reuse_semaphore_callback(key, item),
 			)
 			return True
-		logger.debug('<Cache> deleting old semaphore obj %s', hex(id(self)))
+		logger.debug('<Throttle> deleting old semaphore obj %s', hex(id(self)))
 		sem.set_leak_done()
 		self._cache.delete(key)
 		return False

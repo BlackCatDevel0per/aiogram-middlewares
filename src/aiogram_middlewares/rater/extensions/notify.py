@@ -97,8 +97,9 @@ class RateNotifyCooldown(RateMiddleABC):
 		cooldown_message: str | None,
 		warnings_count: PositiveInt,
 	) -> None:
-		if warnings_count > 1:
-			msg = '`warnings_count` must be positive!'
+		# TODO: Check to int..
+		if warnings_count < 0:
+			msg = f'`warnings_count` must be positive, `{warnings_count=}`'
 			raise ValueError(msg)
 
 		self.warnings_count = warnings_count

@@ -16,6 +16,7 @@ from .extensions import (
 	RateThrottleNotifyBase,
 	RateThrottleNotifyCalmed,
 	RateThrottleNotifyCC,
+	RateThrottleNotifyCooldown,
 )
 
 if TYPE_CHECKING:
@@ -71,6 +72,7 @@ class AssembleInit:
 		)
 
 		if RaterThrottleBase in mro:
+			# TODO: Make it less messy..
 			RaterThrottleBase.__init__(
 				self,
 				sem_period=sem_period,
@@ -81,6 +83,18 @@ class AssembleInit:
 					self,
 					cooldown_message=cooldown_message,
 					calmed_message=calmed_message,
+					warnings_count=warnings_count,
+				)
+			##
+			elif RateThrottleNotifyCooldown in mro:
+				logger.debug(
+					'Calmed notify disabled for `%s` at `%s`',
+					self.__class__.__name__, hex(id(self.__class__.__name__)),
+				)
+
+				RateThrottleNotifyCooldown.__init__(
+					self,
+					cooldown_message=cooldown_message,
 					warnings_count=warnings_count,
 				)
 			elif RateThrottleNotifyCalmed in mro:
@@ -148,41 +162,50 @@ class RaterAssembler:
 		if not bound:
 			msg = "Expected class, got '%s'"
 			raise ValueError(msg % type(bound).__name__)
-		logger.debug('Assembling <%s> Args: %s', bound.__name__, str(kwargs))
 		bases: list[type] = [bound, AssembleInit]
 
 		throttling_mode: bool = kwargs.pop('throttling_mode', False)
+		if not throttling_mode:
+			kwargs.pop('sem_period', None)
 		rnb = RateNotifyBase if not throttling_mode else RateThrottleNotifyBase
-		log__is_throttle_notify = lambda: logger.debug(  # noqa: E731
+		log__onis_throttle_notify = lambda: logger.debug(  # noqa: E731
 			'Throttling mode enabled, notifications will based on `%s`',
 			RateThrottleNotifyBase.__name__,
-		)
+		) if throttling_mode else ...
+
+		# FIXME: Use repr..
+		logger.debug('Assembling <%s> Passed non-default args: %s', bound.__name__, str(kwargs))
 
 		if kwargs.get('data_serializer', _NO_SET) is not _NO_SET:
 			bases.append(RateSerializable)
 
 		# FIXME: Recheck! & queuing..
-		# FIXME: warnings_count
 		if kwargs.get('cooldown_message', _NO_SET) is not None and \
 			kwargs.get('calmed_message', _NO_SET) is not None:
 			# TODO: Make func/meta for this stuff..
-			rncc = make_class_on(bases=(
+			rncc = make_class_on(
+				bases=(
 					RateNotifyCC if not throttling_mode else RateThrottleNotifyCC, rnb,
 				),
 			)
-			log__is_throttle_notify()
+			log__onis_throttle_notify()
 			bases.append(rncc)
 		##
 		elif kwargs.get('cooldown_message', _NO_SET) is not None:
-			rnc = make_class_on(bases=(RateNotifyCooldown, rnb))
-			log__is_throttle_notify()
-			bases.append(rnc)
-		elif kwargs.get('calmed_message', _NO_SET) is not None:
-			rncd = make_class_on(bases=(
-					RateNotifyCalmed if not throttling_mode else RateThrottleNotifyCC, rnb,
+			rnc = make_class_on(
+				bases=(
+					RateNotifyCooldown if not throttling_mode else RateThrottleNotifyCooldown, rnb,
 				),
 			)
-			log__is_throttle_notify()
+			log__onis_throttle_notify()
+			bases.append(rnc)
+		elif kwargs.get('calmed_message', _NO_SET) is not None:
+			rncd = make_class_on(
+				bases=(
+					RateNotifyCalmed if not throttling_mode else RateThrottleNotifyCalmed, rnb,
+				),
+			)
+			log__onis_throttle_notify()
 			bases.append(rncd)
 
 

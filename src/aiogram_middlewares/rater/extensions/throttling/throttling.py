@@ -37,19 +37,21 @@ class RaterThrottleBase(RaterABC):
 		self.sem_period: PositiveInt | PositiveFloat
 
 		if sem_period is None:
-			self.sem_period = self.period_sec - (self.period_sec / 90)  # FIXME: %%
+			sem_period = self.period_sec - ((self.period_sec / 100) * 10)  # FIXME: %%
 			logger.warning(
-				'Throttle period is not set! In use: %f',
-				self.sem_period,
+				'[yellow blink]Throttle period is not set![/] Using: %f',
+				sem_period,
+				extra={'markup': True},
 			)  # TODO: More info..
-		else:
-			if sem_period >= self.period_sec:
-				msg = (
-					f'Throttle time must be lower than ttl!'
-					f' `{sem_period=}` >= `period_sec={self.period_sec}`'
-				)
-				raise ValueError(msg)
-			self.sem_period = sem_period
+
+		if sem_period >= self.period_sec:
+			msg = (
+				f'Throttle time must be lower than ttl!'
+				f' `{sem_period=}` >= `period_sec={self.period_sec}`'
+			)
+			raise ValueError(msg)
+
+		self.sem_period = sem_period
 
 		self._sem_original = ThrottleSemaphore(
 			max_rate=self.after_handle_count,
@@ -141,6 +143,7 @@ class RaterThrottleBase(RaterABC):
 		sem = self._cache.get_obj(event_user.id)
 		assert sem is not None  # plug for linter
 
+		# FIXME: Fix serializer by serialize data before throttle (& mb for main antiflood too..)
 		await self.throttle(sem)
 		# count up rate & proc
 		return await self.proc_handle(

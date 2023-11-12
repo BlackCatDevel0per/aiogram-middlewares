@@ -110,7 +110,7 @@ class RateThrottleNotifyCalmed(RateThrottleMiddleABC):
 
 
 	async def on_exceed_rate(
-		self: RateThrottleNotifyCalmed,
+		self: RateThrottleNotifyCalmed | RateThrottleNotifyCC,
 		handle: HandleType,  # noqa: ARG002
 		rate_data: RateData, sem: ThrottleSemaphore, event: Update, event_user: User,  # noqa: ARG002
 		data: HandleData,  # noqa: ARG002
@@ -130,8 +130,43 @@ class RateThrottleNotifyCalmed(RateThrottleMiddleABC):
 		# ...
 
 
+class RateThrottleNotifyCooldown(RateThrottleMiddleABC):
+
+	def __init__(
+		self: RateThrottleNotifyCooldown,  # TODO: Pass Final Assembler..
+		cooldown_message: str | None,
+		warnings_count: PositiveInt,
+	) -> None:
+		# TODO: Check to int..
+		if warnings_count < 0:
+			msg = f'`warnings_count` must be positive, `{warnings_count=}`'
+			raise ValueError(msg)
+
+		self.warnings_count = warnings_count
+		self.cooldown_message = cooldown_message
+
+
+	async def on_exceed_rate(
+		self: RateThrottleNotifyCooldown | RateThrottleNotifyCC,
+		handle: HandleType,
+		rate_data: RateData, sem: ThrottleSemaphore | None, event: Update, event_user: User,  # noqa: ARG002
+		data: HandleData,
+		bot: Bot,
+	) -> None:
+		await RateNotifyCooldown.on_exceed_rate(
+			self, handle, rate_data, event, event_user, data, bot,
+		)
+
+
+	async def try_user_warning(
+		self: RateThrottleNotifyCooldown | RateThrottleNotifyCC, rate_data: RateData,
+		event_user: User, bot: Bot,
+	) -> None:
+		return await RateNotifyCooldown.try_user_warning(self, rate_data, event_user, bot)
+
+
 # Cooldown + Calmed
-class RateThrottleNotifyCC(RateThrottleMiddleABC):
+class RateThrottleNotifyCC(RateThrottleNotifyCooldown):
 
 	def __init__(
 		self: RateThrottleNotifyCC,
@@ -143,18 +178,15 @@ class RateThrottleNotifyCC(RateThrottleMiddleABC):
 		self.calmed_message = calmed_message
 
 
-	try_user_warning = RateNotifyCooldown.try_user_warning
-
-
-	async def on_exceed_rate(  # type: ignore
+	async def on_exceed_rate(
 		self: RateThrottleNotifyCC,
 		handle: HandleType,
 		rate_data: RateData, sem: ThrottleSemaphore, event: Update, event_user: User,
 		data: HandleData,
 		bot: Bot,
 	) -> None:
-		await RateNotifyCooldown.on_exceed_rate(
-			self, handle, rate_data, event, event_user, data, bot,
+		await super().on_exceed_rate(
+			handle, rate_data, None, event, event_user, data, bot,
 		)
 		await RateThrottleNotifyCalmed.on_exceed_rate(
 			self, handle, rate_data, sem, event, event_user, data, bot,

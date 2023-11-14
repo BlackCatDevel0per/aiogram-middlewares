@@ -6,7 +6,10 @@ from contextlib import suppress as exception_suppress
 from time import perf_counter
 from typing import TYPE_CHECKING
 
-from aiogram_middlewares.utils import BrotliedPickleSerializer, make_dataclass
+from aiogram_middlewares.utils import (
+	BrotliedPickleSerializer,
+	make_dataclass,
+)
 
 if TYPE_CHECKING:
 	from asyncio import AbstractEventLoop, Task, TimerHandle
@@ -60,15 +63,28 @@ class LazyMemoryCache:
 		self._cache: dict[Any, CacheItem] = {}
 		self._ttl = ttl
 
-		self._loop = loop if loop else asyncio.get_event_loop()
+		self._loop = loop
+
+		self._make_handle = self._make_handle_with_loop_check
 
 
-	def _make_handle(
+	def _make_handle_(
 		self: LazyMemoryCache, ttl: ttl_type,
 		callback: Callable, *args: Any,
 	) -> TimerHandle:
 		"""Wrap around asyncio event loop's `call_later` method."""
+		assert self._loop  # plug for
 		return self._loop.call_later(ttl, callback, *args)
+
+
+	def _make_handle_with_loop_check(
+		self: LazyMemoryCache, ttl: ttl_type,
+		callback: Callable, *args: Any,
+	) -> TimerHandle:
+		if self._loop is None:
+			self._loop = asyncio.get_running_loop()
+		self._make_handle = self._make_handle_
+		return self._make_handle_(ttl, callable, *args)
 
 
 	def _make_handle_delete(
@@ -233,6 +249,7 @@ class LazyMemoryCache:
 	) -> true:
 		item = self.cancel_handle(key)
 
+		assert self._loop
 		item.handle = self._loop.call_later(
 			ttl,
 			self.wrap_delete_with_subcall(key, plugged_awaitable),

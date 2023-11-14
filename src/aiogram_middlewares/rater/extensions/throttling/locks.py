@@ -45,7 +45,7 @@ class ThrottleSemaphore(Semaphore):
 		# TODO: Refactor..
 
 		_delay_time: PositiveFloat = time_period / max_rate
-		loop = loop if loop else asyncio.get_event_loop()  # @dep
+		loop = loop  # @dep
 		# Checks
 		self.__checks_init(max_rate, time_period)
 		# Init attrs
@@ -97,6 +97,8 @@ class ThrottleSemaphore(Semaphore):
 		if not self.leak_task:
 			# TODO: Add delete callback
 			# TODO: Refactor..
+			if self._loop is None:
+				self._loop = asyncio.get_running_loop()
 			self.leak_task = self._loop.create_task(self._leak_sem_task())
 		self.acquire = self._acquire  # type: ignore
 		return await self.acquire()

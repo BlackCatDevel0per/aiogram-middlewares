@@ -118,7 +118,7 @@ class RaterBase(RaterABC):
 		# For unity cache for all instances
 		#
 		self.__is_cache_unity = is_cache_unity
-		self._loop = loop if loop else asyncio.get_event_loop()##
+		self._loop = loop##
 		self.choose_cache(RaterBase)
 
 

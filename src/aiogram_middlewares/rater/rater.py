@@ -69,6 +69,7 @@ class AssembleInit:
 			period_sec=period_sec, after_handle_count=after_handle_count,
 			data_serializer=data_serializer,
 			is_cache_unity=is_cache_unity,
+			# TODO: Use loop arg or/and remove in some places..
 			loop=loop,  ##@dep
 		)
 
